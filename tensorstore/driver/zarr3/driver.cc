@@ -149,8 +149,6 @@ class ZarrDriverSpec
       jb::Member("field", jb::Projection<&ZarrDriverSpec::selected_field>(
               jb::DefaultValue<jb::kNeverIncludeDefaults>(
                   [](auto* obj) { *obj = std::string{}; }))),
-
-      // NEW: wrap the open_as_void projection in a Validate
       jb::Member("open_as_void", jb::Projection<&ZarrDriverSpec::open_as_void>(
                   jb::DefaultValue<jb::kNeverIncludeDefaults>(
                       [](auto* v) { *v = false; }))));
