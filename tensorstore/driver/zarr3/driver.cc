@@ -581,7 +581,7 @@ class ZarrDataCache : public ChunkCacheImpl, public DataCacheBase {
         grid_(DataCacheBase::GetChunkGridSpecification(
             metadata(),
             // Check if this is void access by examining the dtype
-            ChunkCacheImpl::open_as_void_ ? kVoidFieldIndex : 0)) {}
+            ChunkCacheImpl::open_as_void_ ? kVoidFieldIndex : false)) {}
 
   const internal::LexicographicalGridIndexKeyParser& GetChunkStorageKeyParser()
       final {
