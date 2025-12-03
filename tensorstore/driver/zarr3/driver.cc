@@ -151,14 +151,9 @@ class ZarrDriverSpec
                   [](auto* obj) { *obj = std::string{}; }))),
 
       // NEW: wrap the open_as_void projection in a Validate
-      jb::Member("open_as_void",
-          jb::Validate(
-              [](const auto& options, ZarrDriverSpec* obj) -> absl::Status {
-                return absl::OkStatus();  // TODO: Remove the validation from here. This was part of the void field shim.
-              },
-              jb::Projection<&ZarrDriverSpec::open_as_void>(
+      jb::Member("open_as_void", jb::Projection<&ZarrDriverSpec::open_as_void>(
                   jb::DefaultValue<jb::kNeverIncludeDefaults>(
-                      [](auto* v) { *v = false; })))));
+                      [](auto* v) { *v = false; }))));
 
 
 
