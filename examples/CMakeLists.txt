@@ -77,21 +77,22 @@ file(GLOB_RECURSE AOM_LIBS "${DEPS_DIR}/aom-build/*.a")
 file(GLOB_RECURSE WEBP_LIBS "${DEPS_DIR}/webp-build/*.a")
 file(GLOB_RECURSE CURL_LIBS "${DEPS_DIR}/curl-build/*.a")
 
-# Create executable
+# Create executables
 add_executable(read_structured_zarr3 read_structured_zarr3.cc)
+add_executable(read_foo_zarr read_foo_zarr.cc)
 
 # Link libraries - use whole-archive for libraries that use static registration
 # These include drivers, codecs, kvstores, and context resource providers
-target_link_libraries(read_structured_zarr3 PRIVATE
+target_link_libraries(read_foo_zarr PRIVATE
     # Force inclusion of libraries with static registrations
     -Wl,--whole-archive
-    
+
     # Context resource providers
     ${TENSORSTORE_BUILD_DIR}/libtensorstore_internal_data_copy_concurrency_resource.a
     ${TENSORSTORE_BUILD_DIR}/libtensorstore_internal_file_io_concurrency_resource.a
     ${TENSORSTORE_BUILD_DIR}/libtensorstore_internal_cache_cache_pool_resource.a
     ${TENSORSTORE_BUILD_DIR}/libtensorstore_internal_concurrency_resource.a
-    
+
     # Zarr3 driver and codecs
     ${TENSORSTORE_BUILD_DIR}/libtensorstore_driver_zarr3_driver.a
     ${TENSORSTORE_BUILD_DIR}/libtensorstore_driver_zarr3_codec_blosc.a
@@ -102,24 +103,24 @@ target_link_libraries(read_structured_zarr3 PRIVATE
     ${TENSORSTORE_BUILD_DIR}/libtensorstore_driver_zarr3_codec_zstd.a
     ${TENSORSTORE_BUILD_DIR}/libtensorstore_driver_zarr3_codec_sharding_indexed.a
     ${TENSORSTORE_BUILD_DIR}/libtensorstore_driver_zarr3_codec_codec_chain_spec.a
-    
+
     # File kvstore and its resource providers
     ${TENSORSTORE_BUILD_DIR}/libtensorstore_kvstore_file.a
     ${TENSORSTORE_BUILD_DIR}/libtensorstore_kvstore_file_file_resource.a
-    
+
     -Wl,--no-whole-archive
-    
+
     -Wl,--start-group
-    
+
     # Tensorstore libs
     ${TENSORSTORE_LIBS}
-    
+
     # Riegeli
     ${RIEGELI_LIBS}
-    
+
     # Abseil
     ${ABSEIL_LIBS}
-    
+
     # Compression libs
     ${BLOSC_LIBS}
     ${ZSTD_LIBS}
@@ -129,32 +130,115 @@ target_link_libraries(read_structured_zarr3 PRIVATE
     ${ZLIB_LIBS}
     ${LIBLZMA_LIBS}
     ${BZIP2_LIBS}
-    
+
     # Regex
     ${RE2_LIBS}
-    
+
     # Protocol buffers and gRPC
     ${PROTOBUF_LIBS}
     ${GRPC_LIBS}
     ${CARES_LIBS}
-    
+
     # SSL/TLS
     ${SSL_LIBS}
     ${CRYPTO_LIBS}
-    
-    # Image libraries  
+
+    # Image libraries
     ${JPEG_LIBS}
     ${PNG_LIBS}
     ${TIFF_LIBS}
     ${AVIF_LIBS}
     ${AOM_LIBS}
     ${WEBP_LIBS}
-    
+
     # HTTP
     ${CURL_LIBS}
-    
+
     -Wl,--end-group
-    
+
+    # System libraries
+    pthread
+    dl
+    m
+    rt
+)
+
+
+# Link libraries - use whole-archive for libraries that use static registration
+# These include drivers, codecs, kvstores, and context resource providers
+target_link_libraries(read_structured_zarr3 PRIVATE
+    # Force inclusion of libraries with static registrations
+    -Wl,--whole-archive
+
+    # Context resource providers
+    ${TENSORSTORE_BUILD_DIR}/libtensorstore_internal_data_copy_concurrency_resource.a
+    ${TENSORSTORE_BUILD_DIR}/libtensorstore_internal_file_io_concurrency_resource.a
+    ${TENSORSTORE_BUILD_DIR}/libtensorstore_internal_cache_cache_pool_resource.a
+    ${TENSORSTORE_BUILD_DIR}/libtensorstore_internal_concurrency_resource.a
+
+    # Zarr3 driver and codecs
+    ${TENSORSTORE_BUILD_DIR}/libtensorstore_driver_zarr3_driver.a
+    ${TENSORSTORE_BUILD_DIR}/libtensorstore_driver_zarr3_codec_blosc.a
+    ${TENSORSTORE_BUILD_DIR}/libtensorstore_driver_zarr3_codec_bytes.a
+    ${TENSORSTORE_BUILD_DIR}/libtensorstore_driver_zarr3_codec_crc32c.a
+    ${TENSORSTORE_BUILD_DIR}/libtensorstore_driver_zarr3_codec_gzip.a
+    ${TENSORSTORE_BUILD_DIR}/libtensorstore_driver_zarr3_codec_transpose.a
+    ${TENSORSTORE_BUILD_DIR}/libtensorstore_driver_zarr3_codec_zstd.a
+    ${TENSORSTORE_BUILD_DIR}/libtensorstore_driver_zarr3_codec_sharding_indexed.a
+    ${TENSORSTORE_BUILD_DIR}/libtensorstore_driver_zarr3_codec_codec_chain_spec.a
+
+    # File kvstore and its resource providers
+    ${TENSORSTORE_BUILD_DIR}/libtensorstore_kvstore_file.a
+    ${TENSORSTORE_BUILD_DIR}/libtensorstore_kvstore_file_file_resource.a
+
+    -Wl,--no-whole-archive
+
+    -Wl,--start-group
+
+    # Tensorstore libs
+    ${TENSORSTORE_LIBS}
+
+    # Riegeli
+    ${RIEGELI_LIBS}
+
+    # Abseil
+    ${ABSEIL_LIBS}
+
+    # Compression libs
+    ${BLOSC_LIBS}
+    ${ZSTD_LIBS}
+    ${LZ4_LIBS}
+    ${SNAPPY_LIBS}
+    ${BROTLI_LIBS}
+    ${ZLIB_LIBS}
+    ${LIBLZMA_LIBS}
+    ${BZIP2_LIBS}
+
+    # Regex
+    ${RE2_LIBS}
+
+    # Protocol buffers and gRPC
+    ${PROTOBUF_LIBS}
+    ${GRPC_LIBS}
+    ${CARES_LIBS}
+
+    # SSL/TLS
+    ${SSL_LIBS}
+    ${CRYPTO_LIBS}
+
+    # Image libraries
+    ${JPEG_LIBS}
+    ${PNG_LIBS}
+    ${TIFF_LIBS}
+    ${AVIF_LIBS}
+    ${AOM_LIBS}
+    ${WEBP_LIBS}
+
+    # HTTP
+    ${CURL_LIBS}
+
+    -Wl,--end-group
+
     # System libraries
     pthread
     dl
