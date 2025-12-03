@@ -803,8 +803,6 @@ Result<size_t> GetFieldIndex(const ZarrDType& dtype,
                              bool open_as_void) {
   // Special case: open_as_void requests raw byte access (works for any dtype)
 
-  std::cout << "The value of selected_field is '" << selected_field << "' and the value of open_as_void is `" << open_as_void << "'" << std::endl;
-
   if (open_as_void) {
     if (dtype.fields.empty()) {
       return absl::FailedPreconditionError(
@@ -1144,8 +1142,6 @@ Result<std::shared_ptr<const ZarrMetadata>> GetNewMetadata(
     const ZarrMetadataConstraints& metadata_constraints, const Schema& schema,
     std::string_view selected_field, bool open_as_void) {
   auto metadata = std::make_shared<ZarrMetadata>();
-
-  std::cout << "The value of open as void from GetNewMetadata is " << open_as_void << std::endl;
 
   metadata->zarr_format = metadata_constraints.zarr_format.value_or(3);
   metadata->chunk_key_encoding =

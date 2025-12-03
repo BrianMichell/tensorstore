@@ -154,13 +154,7 @@ class ZarrDriverSpec
       jb::Member("open_as_void",
           jb::Validate(
               [](const auto& options, ZarrDriverSpec* obj) -> absl::Status {
-                // At this point, Projection has already set obj->open_as_void
-                // if (obj->open_as_void) {
-                //   obj->selected_field = "<void>";
-                // }
-                std::cout << "I have the open_as_void flag present in my driver spec" << std::endl;
-                // obj->open_as_void = true;
-                return absl::OkStatus();
+                return absl::OkStatus();  // TODO: Remove the validation from here. This was part of the void field shim.
               },
               jb::Projection<&ZarrDriverSpec::open_as_void>(
                   jb::DefaultValue<jb::kNeverIncludeDefaults>(
@@ -627,15 +621,12 @@ class ZarrDataCache : public ChunkCacheImpl, public DataCacheBase {
 
     // Check if this is void access by examining the stored flag
     const bool is_void_access = ChunkCacheImpl::open_as_void_;
-    std::cout << "The chunk cache impl value of open as void is " << is_void_access << std::endl;
 
     if (is_void_access) {
-        std::cout << "I am now in the external to internal block" << std::endl;
       // For void access, create transform with extra bytes dimension
       const DimensionIndex rank = metadata.rank;
       const Index bytes_per_element = metadata.data_type.bytes_per_outer_element;
       const DimensionIndex total_rank = rank + 1;
-      std::cout << "\t1" << std::endl;
 
       std::string_view normalized_dimension_names[kMaxRank];
       for (DimensionIndex i = 0; i < rank; ++i) {
@@ -643,7 +634,6 @@ class ZarrDataCache : public ChunkCacheImpl, public DataCacheBase {
           normalized_dimension_names[i] = *name;
         }
       }
-      std::cout << "\t2" << std::endl;
 
       auto builder =
           tensorstore::IndexTransformBuilder<>(total_rank, total_rank);
@@ -651,19 +641,16 @@ class ZarrDataCache : public ChunkCacheImpl, public DataCacheBase {
       full_shape.push_back(bytes_per_element);
       builder.input_shape(full_shape);
       builder.input_labels(span(&normalized_dimension_names[0], total_rank));
-      std::cout << "\t3" << std::endl;
 
       DimensionSet implicit_upper_bounds(false);
       for (DimensionIndex i = 0; i < rank; ++i) {
         implicit_upper_bounds[i] = true;
       }
       builder.implicit_upper_bounds(implicit_upper_bounds);
-      std::cout << "\t4" << std::endl;
 
       for (DimensionIndex i = 0; i < total_rank; ++i) {
         builder.output_single_input_dimension(i, i);
       }
-      std::cout << "\t5" << std::endl;
       return builder.Finalize();
     }
 
@@ -824,9 +811,7 @@ class ZarrDriver::OpenState : public ZarrDriver::OpenStateBase {
         *static_cast<const ZarrMetadata*>(initializer.metadata.get());
     // For void access, modify the dtype to indicate special handling
     ZarrDType dtype = metadata.data_type;
-    // if (spec().selected_field == "<void>") {
     if (spec().open_as_void) {
-        std::cout << "open_as_void was specified so I will create the 'synthetic' dtype" << std::endl;
       // Create a synthetic dtype for void access
       dtype = ZarrDType{
           /*.has_fields=*/false,
