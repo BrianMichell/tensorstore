@@ -799,12 +799,16 @@ std::string GetFieldNames(const ZarrDType& dtype) {
 constexpr size_t kVoidFieldIndex = size_t(-1);
 
 Result<size_t> GetFieldIndex(const ZarrDType& dtype,
-                             std::string_view selected_field) {
-  // Special case: "<void>" requests raw byte access (works for any dtype)
-  if (selected_field == "<void>") {
+                             std::string_view selected_field,
+                             bool open_as_void) {
+  // Special case: open_as_void requests raw byte access (works for any dtype)
+
+  std::cout << "The value of selected_field is '" << selected_field << "' and the value of open_as_void is `" << open_as_void << "'" << std::endl;
+
+  if (open_as_void) {
     if (dtype.fields.empty()) {
       return absl::FailedPreconditionError(
-          "Requested field \"<void>\" but dtype has no fields");
+          "Requested void access but dtype has no fields");
     }
     return kVoidFieldIndex;
   }
@@ -1138,8 +1142,10 @@ absl::Status ValidateMetadataSchema(const ZarrMetadata& metadata,
 
 Result<std::shared_ptr<const ZarrMetadata>> GetNewMetadata(
     const ZarrMetadataConstraints& metadata_constraints, const Schema& schema,
-    std::string_view selected_field) {
+    std::string_view selected_field, bool open_as_void) {
   auto metadata = std::make_shared<ZarrMetadata>();
+
+  std::cout << "The value of open as void from GetNewMetadata is " << open_as_void << std::endl;
 
   metadata->zarr_format = metadata_constraints.zarr_format.value_or(3);
   metadata->chunk_key_encoding =
@@ -1165,7 +1171,7 @@ Result<std::shared_ptr<const ZarrMetadata>> GetNewMetadata(
   }
 
   TENSORSTORE_ASSIGN_OR_RETURN(
-      size_t field_index, GetFieldIndex(metadata->data_type, selected_field));
+      size_t field_index, GetFieldIndex(metadata->data_type, selected_field, open_as_void));
   SpecRankAndFieldInfo info;
   info.field = &metadata->data_type.fields[field_index];
   info.chunked_rank = metadata_constraints.rank;

@@ -75,10 +75,12 @@ ZarrChunkCache::~ZarrChunkCache() = default;
 
 ZarrLeafChunkCache::ZarrLeafChunkCache(
     kvstore::DriverPtr store, ZarrCodecChain::PreparedState::Ptr codec_state,
-    ZarrDType dtype, internal::CachePool::WeakPtr /*data_cache_pool*/)
+    ZarrDType dtype, internal::CachePool::WeakPtr /*data_cache_pool*/,
+    bool open_as_void)
     : Base(std::move(store)),
       codec_state_(std::move(codec_state)),
-      dtype_(std::move(dtype)) {}
+      dtype_(std::move(dtype)),
+      open_as_void_(open_as_void) {}
 
 void ZarrLeafChunkCache::Read(ZarrChunkCache::ReadRequest request,
                               AnyFlowReceiver<absl::Status, internal::ReadChunk,
@@ -157,7 +159,7 @@ ZarrLeafChunkCache::DecodeChunk(span<const Index> chunk_indices,
   absl::InlinedVector<SharedArray<const void>, 1> field_arrays(num_fields);
 
   // Special case: void access - return raw bytes directly
-  if (num_fields == 1 && dtype_.fields[0].name == "<void>") {
+  if (open_as_void_) {
     TENSORSTORE_ASSIGN_OR_RETURN(
         field_arrays[0], codec_state_->DecodeArray(grid().components[0].shape(),
                                                    std::move(data)));
@@ -221,11 +223,13 @@ kvstore::Driver* ZarrLeafChunkCache::GetKvStoreDriver() {
 
 ZarrShardedChunkCache::ZarrShardedChunkCache(
     kvstore::DriverPtr store, ZarrCodecChain::PreparedState::Ptr codec_state,
-    ZarrDType dtype, internal::CachePool::WeakPtr data_cache_pool)
+    ZarrDType dtype, internal::CachePool::WeakPtr data_cache_pool,
+    bool open_as_void)
     : base_kvstore_(std::move(store)),
       codec_state_(std::move(codec_state)),
       dtype_(std::move(dtype)),
-      data_cache_pool_(std::move(data_cache_pool)) {}
+      data_cache_pool_(std::move(data_cache_pool)),
+      open_as_void_(open_as_void) {}
 
 Result<IndexTransform<>> TranslateCellToSourceTransformForShard(
     IndexTransform<> transform, span<const Index> grid_cell_indices,
@@ -517,6 +521,7 @@ void ZarrShardedChunkCache::Entry::DoInitialize() {
       cache.GetChunkStorageKeyParser().FormatKey(cell_indices()),
       cache.executor(), internal::CachePool::WeakPtr(cache.pool()));
   ZarrChunkCache* zarr_chunk_cache;
+  std::cout << "The cached value of open_as_void_ from line 524 in chunk_cache.cc is " << cache.open_as_void_ << std::endl;
   internal::GetCache<internal::Cache>(
       // `cache.pool()` is the metadata cache pool, which may or may not be
       // equal to the data cache pool. If the sub-chunk cache is a leaf cache
@@ -534,11 +539,12 @@ void ZarrShardedChunkCache::Entry::DoInitialize() {
                 *sharding_state.sub_chunk_codec_chain,
                 std::move(sharding_kvstore), cache.executor(),
                 ZarrShardingCodec::PreparedState::Ptr(&sharding_state),
-                cache.dtype_, cache.data_cache_pool_);
+                cache.dtype_, cache.data_cache_pool_, cache.open_as_void_);
         zarr_chunk_cache = new_cache.release();
         return std::unique_ptr<internal::Cache>(&zarr_chunk_cache->cache());
       })
       .release();
+  std::cout << "The cached value of open_as_void_ from line 547 in chunk_cache.cc is " << cache.open_as_void_ << std::endl;
   sub_chunk_cache =
       ZarrChunkCache::Ptr(zarr_chunk_cache, internal::adopt_object_ref);
   sub_chunk_cache->parent_chunk_ = this;
