@@ -594,10 +594,7 @@ class ZarrDataCache : public ChunkCacheImpl, public DataCacheBase {
         grid_(DataCacheBase::GetChunkGridSpecification(
             metadata(),
             // Check if this is void access by examining the dtype
-            (ChunkCacheImpl::dtype_.fields.size() == 1 &&
-             ChunkCacheImpl::dtype_.fields[0].name == "<void>")
-                ? kVoidFieldIndex
-                : 0)) {}
+            ChunkCacheImpl::open_as_void_ ? kVoidFieldIndex : 0)) {}
 
   const internal::LexicographicalGridIndexKeyParser& GetChunkStorageKeyParser()
       final {
@@ -633,10 +630,12 @@ class ZarrDataCache : public ChunkCacheImpl, public DataCacheBase {
     std::cout << "The chunk cache impl value of open as void is " << is_void_access << std::endl;
 
     if (is_void_access) {
+        std::cout << "I am now in the external to internal block" << std::endl;
       // For void access, create transform with extra bytes dimension
       const DimensionIndex rank = metadata.rank;
       const Index bytes_per_element = metadata.data_type.bytes_per_outer_element;
       const DimensionIndex total_rank = rank + 1;
+      std::cout << "\t1" << std::endl;
 
       std::string_view normalized_dimension_names[kMaxRank];
       for (DimensionIndex i = 0; i < rank; ++i) {
@@ -644,6 +643,7 @@ class ZarrDataCache : public ChunkCacheImpl, public DataCacheBase {
           normalized_dimension_names[i] = *name;
         }
       }
+      std::cout << "\t2" << std::endl;
 
       auto builder =
           tensorstore::IndexTransformBuilder<>(total_rank, total_rank);
@@ -651,16 +651,19 @@ class ZarrDataCache : public ChunkCacheImpl, public DataCacheBase {
       full_shape.push_back(bytes_per_element);
       builder.input_shape(full_shape);
       builder.input_labels(span(&normalized_dimension_names[0], total_rank));
+      std::cout << "\t3" << std::endl;
 
       DimensionSet implicit_upper_bounds(false);
       for (DimensionIndex i = 0; i < rank; ++i) {
         implicit_upper_bounds[i] = true;
       }
       builder.implicit_upper_bounds(implicit_upper_bounds);
+      std::cout << "\t4" << std::endl;
 
       for (DimensionIndex i = 0; i < total_rank; ++i) {
         builder.output_single_input_dimension(i, i);
       }
+      std::cout << "\t5" << std::endl;
       return builder.Finalize();
     }
 
@@ -804,7 +807,7 @@ class ZarrDriver::OpenState : public ZarrDriver::OpenStateBase {
     TENSORSTORE_ASSIGN_OR_RETURN(
         auto metadata,
         internal_zarr3::GetNewMetadata(spec().metadata_constraints,
-                                       spec().schema),
+                                       spec().schema, spec().selected_field, spec().open_as_void),
         tensorstore::MaybeAnnotateStatus(
             _, "Cannot create using specified \"metadata\" and schema"));
     return metadata;
@@ -821,15 +824,17 @@ class ZarrDriver::OpenState : public ZarrDriver::OpenStateBase {
         *static_cast<const ZarrMetadata*>(initializer.metadata.get());
     // For void access, modify the dtype to indicate special handling
     ZarrDType dtype = metadata.data_type;
-    if (spec().selected_field == "<void>") {
+    // if (spec().selected_field == "<void>") {
+    if (spec().open_as_void) {
+        std::cout << "open_as_void was specified so I will create the 'synthetic' dtype" << std::endl;
       // Create a synthetic dtype for void access
       dtype = ZarrDType{
           /*.has_fields=*/false,
           /*.fields=*/{ZarrDType::Field{
-              ZarrDType::BaseDType{"<void>", dtype_v<tensorstore::dtypes::byte_t>,
+              ZarrDType::BaseDType{"", dtype_v<tensorstore::dtypes::byte_t>,
                                     {metadata.data_type.bytes_per_outer_element}},
               /*.outer_shape=*/{},
-              /*.name=*/"<void>",
+              /*.name=*/"",
               /*.field_shape=*/{metadata.data_type.bytes_per_outer_element},
               /*.num_inner_elements=*/metadata.data_type.bytes_per_outer_element,
               /*.byte_offset=*/0,
@@ -839,7 +844,8 @@ class ZarrDriver::OpenState : public ZarrDriver::OpenStateBase {
     return internal_zarr3::MakeZarrChunkCache<DataCacheBase, ZarrDataCache>(
         *metadata.codecs, std::move(initializer), spec().store.path,
         metadata.codec_state, dtype,
-        /*data_cache_pool=*/*cache_pool());
+        /*data_cache_pool=*/*cache_pool(),
+        spec().open_as_void);
   }
 
   Result<size_t> GetComponentIndex(const void* metadata_ptr,
