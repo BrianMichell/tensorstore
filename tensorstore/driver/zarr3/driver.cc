@@ -169,7 +169,6 @@ class ZarrDriverSpec
 
   Result<SharedArray<const void>> GetFillValue(
       IndexTransformView<> transform) const override {
-    // Start from any fill value specified on the schema.
     SharedArray<const void> fill_value{schema.fill_value()};
 
     const auto& constraints = metadata_constraints;
@@ -182,7 +181,6 @@ class ZarrDriverSpec
     const auto& vec = *constraints.fill_value;
 
     // If we don't have dtype information, we can't do field-aware logic.
-    // For scalar (legacy) cases this preserves the old behavior.
     if (!constraints.data_type) {
       if (!vec.empty()) return vec[0];
       return fill_value;
@@ -190,7 +188,7 @@ class ZarrDriverSpec
 
     const ZarrDType& dtype = *constraints.data_type;
 
-    // Figure out which field this spec refers to (or void access).
+    // Determine which field this spec refers to (or void access).
     TENSORSTORE_ASSIGN_OR_RETURN(
         size_t field_index,
         GetFieldIndex(dtype, selected_field, open_as_void));
@@ -200,7 +198,7 @@ class ZarrDriverSpec
       if (field_index < vec.size()) {
         return vec[field_index];
       }
-      // Shouldn't happen, but safest fallback is "no fill".
+      // Fallback to "no fill".
       return SharedArray<const void>();
     }
 
