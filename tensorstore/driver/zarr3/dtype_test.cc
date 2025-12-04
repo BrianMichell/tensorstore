@@ -17,6 +17,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include <cstddef>  // for std::byte
 #include <string>
 #include <vector>
 
