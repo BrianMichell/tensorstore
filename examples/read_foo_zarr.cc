@@ -26,7 +26,7 @@
 
 
 ABSL_FLAG(std::string, zarr_path,
-          "/home/ubuntu/source/tensorstore/foo.zarr",
+          "/foo.zarr",
           "Path to the foo.zarr directory");
 
 namespace {
@@ -124,10 +124,6 @@ absl::Status ReadAndDisplayData(const tensorstore::TensorStore<>& store,
     return absl::OkStatus();
   }
 
-  // For each (i, j), read a T starting at:
-  //   base = (i * shape[1] + j) * record_bytes + offset_bytes
-  //
-  // This means "offset inside each record".
   for (Index i = 0; i < rows; ++i) {
     for (Index j = 0; j < cols; ++j) {
       Index record_index_2d = i * shape[1] + j;
@@ -165,11 +161,7 @@ absl::Status Run(const std::string& zarr_path) {
   spec["kvstore"]["driver"] = "file";
   spec["kvstore"]["path"] = zarr_path + "/";
   spec["field"] = "field_2";
-  // spec["open_as_void"] = true;
 
-  std::cout << spec.dump(4) << std::endl;
-
-  std::cout << "\nOpening structured array..." << std::endl;
   auto open_result = tensorstore::Open(spec, context, tensorstore::OpenMode::open,
                                       tensorstore::ReadWriteMode::read).result();
 
@@ -181,14 +173,9 @@ absl::Status Run(const std::string& zarr_path) {
   auto store = std::move(open_result).value();
   TENSORSTORE_RETURN_IF_ERROR(ReadAndDisplayData<int32_t>(store, "Structured Array"));
 
-  // Demonstrate the new open_as_void feature for raw byte access
-  std::cout << "\nDemonstrating open_as_void feature..." << std::endl;
-
   ::nlohmann::json void_spec = spec;
   void_spec["open_as_void"] = true;
   void_spec.erase("field");
-
-  std::cout << void_spec.dump(4) << std::endl;
 
   auto void_open_result = tensorstore::Open(void_spec, context, tensorstore::OpenMode::open,
                                            tensorstore::ReadWriteMode::read).result();
@@ -200,16 +187,8 @@ absl::Status Run(const std::string& zarr_path) {
 
   auto void_store = std::move(void_open_result).value();
 
-  // Example: interpret the raw bytes as int32_t starting at a given offset.
-  // Adjust offset_bytes to match the field offset you care about.
-  constexpr Index kFieldOffsetBytes = 4;  // tweak this for your demo
+  constexpr Index kFieldOffsetBytes = 4;
   TENSORSTORE_RETURN_IF_ERROR(ReadAndDisplayData<int32_t>(void_store, "Raw Bytes (open_as_void)", kFieldOffsetBytes));
-
-  std::cout << "\n=== Example completed successfully ===" << std::endl;
-  std::cout << "This demonstrates:" << std::endl;
-  std::cout << "- Reading structured Zarr v3 arrays" << std::endl;
-  std::cout << "- Field-based data access" << std::endl;
-  std::cout << "- The new open_as_void option for raw byte access" << std::endl;
 
   return absl::OkStatus();
 }
