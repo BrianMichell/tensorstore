@@ -610,7 +610,7 @@ struct ReadState : public internal::AtomicReferenceCount<ReadState> {
   }
 
   /// Locks `mutex_`.
-  void lock() ABSL_NO_THREAD_SAFETY_ANALYSIS { mutex_.Lock(); }
+  void lock() ABSL_NO_THREAD_SAFETY_ANALYSIS { mutex_.lock(); }
 
   /// Unlocks `mutex_`, and then sends any deferred notifications.
   void unlock() ABSL_NO_THREAD_SAFETY_ANALYSIS {
@@ -622,7 +622,7 @@ struct ReadState : public internal::AtomicReferenceCount<ReadState> {
     if (canceled_ && on_cancel_) {
       on_cancel = std::move(on_cancel_);
     }
-    mutex_.Unlock();
+    mutex_.unlock();
     if (on_cancel) on_cancel();
     if (!send_done) return;
     if (has_error) {
@@ -844,7 +844,7 @@ bool MaybeEmitIndependentReadChunk(
   const Index num_elements = base_chunk.transform.domain().num_elements();
   bool emit_buffered_chunk;
   {
-    absl::MutexLock lock(&state.mutex_);
+    absl::MutexLock lock(state.mutex_);
     bool has_data_buffer =
         state.data_buffer_.byte_strided_origin_pointer() != nullptr;
     bool remaining_data = (state.remaining_elements_ -= num_elements) != 0;
@@ -892,7 +892,7 @@ struct ReadReceiverImpl {
 
   void set_starting(AnyCancelReceiver on_cancel) {
     {
-      absl::MutexLock lock(&state_->mutex_);
+      absl::MutexLock lock(state_->mutex_);
       if (!state_->canceled_) {
         state_->on_cancel_ = std::move(on_cancel);
         return;
@@ -904,7 +904,7 @@ struct ReadReceiverImpl {
   void set_value(ReadChunk chunk, IndexTransform<> cell_transform) {
     if (cell_transform.domain().box().is_empty()) return;
     {
-      absl::MutexLock lock(&state_->mutex_);
+      absl::MutexLock lock(state_->mutex_);
       if (state_->canceled_) return;
       ++state_->chunks_in_progress_;
     }
@@ -957,7 +957,7 @@ struct ReadReceiverImpl {
   }
 
   void set_stopping() {
-    absl::MutexLock lock(&state_->mutex_);
+    absl::MutexLock lock(state_->mutex_);
     state_->on_cancel_ = {};
   }
 };
