@@ -64,8 +64,6 @@ using ::tensorstore::AllDims;
 using ::tensorstore::Context;
 using ::tensorstore::Dims;
 using ::tensorstore::Index;
-using ::tensorstore::MaybeAnnotateStatus;
-using ::tensorstore::StrCat;
 using ::tensorstore::WriteFutures;
 using ::tensorstore_examples::DataTypeIdOf;
 using ::tensorstore_examples::MakeDataTypeInvoker;
@@ -179,21 +177,20 @@ absl::Status ComputeQuantiles(InputArray& input,
     // Copy input[x, :] into the values.
     TENSORSTORE_RETURN_IF_ERROR(
         tensorstore::CopyTransformedArray(
-            input | Dims(0).TranslateTo(0).IndexSlice(x), values),
-        MaybeAnnotateStatus(_, "ComputeQuantiles copying values"));
+            input | Dims(0).TranslateTo(0).IndexSlice(x), values))
+        .Format("ComputeQuantiles copying values");
 
     // Sort the data.
-    TENSORSTORE_RETURN_IF_ERROR(
-        sort_values(DataTypeIdOf(values), values),
-        MaybeAnnotateStatus(_, "ComputeQuantiles sorting values"));
+    TENSORSTORE_RETURN_IF_ERROR(sort_values(DataTypeIdOf(values), values))
+        .Format("ComputeQuantiles sorting values");
 
     // Materialize the indices data into the output.
     TENSORSTORE_RETURN_IF_ERROR(
         tensorstore::CopyTransformedArray(
             values |
                 Dims(0).IndexArraySlice(tensorstore::UnownedToShared(indices)),
-            output | Dims(0).TranslateTo(0).IndexSlice(x)),
-        MaybeAnnotateStatus(_, "ComputeQuantiles copying output"));
+            output | Dims(0).TranslateTo(0).IndexSlice(x)))
+        .Format("ComputeQuantiles copying output");
   }
 
   return absl::OkStatus();
@@ -354,13 +351,13 @@ absl::Status Run(tensorstore::Spec input_spec, tensorstore::Spec output_spec,
         // staging_xq = staging_xt[:, t, :], shape(x, q)
         TENSORSTORE_ASSIGN_OR_RETURN(  //
             auto staging_xq, staging_xtq | Dims(1).IndexSlice(t),
-            MaybeAnnotateStatus(_, "staging_slice "));
+            _.Format("Error computing staging_xq"));
 
         // tile_slice = tile_xt[:, start:end], shape(x, t')
         TENSORSTORE_ASSIGN_OR_RETURN(
             auto tile_slice,
             tile_xt | Dims(1).HalfOpenInterval(start, end).TranslateTo(0),
-            MaybeAnnotateStatus(_, "staging_slice"));
+            _.Format("Error computing tile_slice"));
 
         TENSORSTORE_RETURN_IF_ERROR(
             ComputeQuantiles(tile_slice, quantiles, staging_xq));

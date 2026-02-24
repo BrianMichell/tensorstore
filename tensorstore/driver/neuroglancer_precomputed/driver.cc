@@ -132,7 +132,7 @@ class NeuroglancerPrecomputedDriverSpec
         return jb::DefaultBinder<>(is_loading, options, &obj->open_constraints,
                                    j);
       },
-      jb::Initialize([](auto* obj) {
+      jb::Initialize([](auto* obj) -> absl::Status {
         TENSORSTORE_RETURN_IF_ERROR(obj->schema.Set(RankConstraint{4}));
         TENSORSTORE_RETURN_IF_ERROR(
             obj->schema.Set(obj->open_constraints.multiscale.dtype));

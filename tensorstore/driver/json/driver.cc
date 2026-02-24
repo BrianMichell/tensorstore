@@ -576,7 +576,7 @@ struct WriteChunkImpl {
       return {};
     }
     if (!success) return {};
-    const auto convert_error = [&](const absl::Status& error) {
+    const auto convert_error = [&](absl::Status error) {
       return WriteChunk::EndWriteResult{
           /*.copy_status=*/entry->AnnotateError(error, /*reading=*/false),
           /*.commit_future=*/{}};
@@ -585,8 +585,9 @@ struct WriteChunkImpl {
         auto node, GetWriteLockedTransactionNode(*entry, transaction),
         convert_error(_));
     TENSORSTORE_RETURN_IF_ERROR(
-        node->changes_.AddChange(driver->json_pointer_, std::move(value)),
-        convert_error(_));
+        node->changes_.AddChange(driver->json_pointer_, std::move(value)))
+        .With(convert_error);
+
     return {/*.copy_status=*/{},
             /*.commit_future=*/node->transaction()->future()};
   }

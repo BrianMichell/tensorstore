@@ -71,6 +71,7 @@
 #include "tensorstore/serialization/std_vector.h"  // IWYU pragma: keep
 #include "tensorstore/spec.h"
 #include "tensorstore/transaction.h"
+#include "tensorstore/util/execution/any_receiver.h"
 #include "tensorstore/util/execution/execution.h"
 #include "tensorstore/util/execution/sender_util.h"
 #include "tensorstore/util/executor.h"
@@ -335,9 +336,8 @@ class DownsampleDriverSpec
           if (auto domain = spec->schema.domain(); domain.valid()) {
             TENSORSTORE_RETURN_IF_ERROR(
                 MergeIndexDomains(domain,
-                                  downsampled_handle.transform.domain()),
-                tensorstore::MaybeAnnotateStatus(
-                    _, "downsampled domain does not match domain in schema"));
+                                  downsampled_handle.transform.domain()))
+                .Format("downsampled domain does not match domain in schema");
           }
           return downsampled_handle;
         },
@@ -935,8 +935,10 @@ struct ReadReceiverImpl {
           state->SetError(_, 1));
       TENSORSTORE_RETURN_IF_ERROR(
           internal::CopyReadChunk(chunk.impl, chunk.transform,
-                                  transformed_data_buffer),
-          state->SetError(_, 1));
+                                  transformed_data_buffer))
+          .With([&](absl::Status error) {
+            state->SetError(std::move(error), 1);
+          });
       {
         std::lock_guard<ReadState> guard(*state);
         bool elements_done = (state->remaining_elements_ -= num_elements) == 0;
@@ -994,8 +996,9 @@ void DownsampleDriver::Read(ReadRequest request, ReadChunkReceiver receiver) {
         TENSORSTORE_RETURN_IF_ERROR(
             internal_downsample::PropagateAndComposeIndexTransformDownsampling(
                 request.transform, base_transform,
-                state->self_->downsample_factors_, propagated),
-            state->SetError(_));
+                state->self_->downsample_factors_, propagated))
+            .With(
+                [&](absl::Status error) { state->SetError(std::move(error)); });
         // The domain of `propagated.transform`, when downsampled by
         // `propagated.input_downsample_factors`, matches
         // `transform.domain()`.
@@ -1040,8 +1043,10 @@ Future<ArrayStorageStatistics> DownsampleDriver::GetStorageStatistics(
                       internal_downsample::
                           PropagateAndComposeIndexTransformDownsampling(
                               request.transform, base_transform,
-                              self->downsample_factors_, propagated),
-                      static_cast<void>(promise.SetResult(_)));
+                              self->downsample_factors_, propagated))
+                      .With([&](absl::Status error) {
+                        promise.SetResult(std::move(error));
+                      });
                   // The domain of `propagated.transform`, when downsampled by
                   // `propagated.input_downsample_factors`, matches
                   // `transform.domain()`.

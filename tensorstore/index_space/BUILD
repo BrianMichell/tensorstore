@@ -235,6 +235,7 @@ tensorstore_cc_test(
         "//tensorstore/util:status_testutil",
         "//tensorstore/util:str_cat",
         "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/strings",
         "@googletest//:gtest_main",
     ],
 )
@@ -499,6 +500,7 @@ tensorstore_cc_test(
         "//tensorstore/util:result",
         "//tensorstore/util:span",
         "//tensorstore/util:status_testutil",
+        "//tensorstore/util:str_cat",
         "@abseil-cpp//absl/status",
         "@googletest//:gtest_main",
     ],
@@ -699,8 +701,8 @@ tensorstore_cc_library(
         "//tensorstore/util:result",
         "//tensorstore/util:span",
         "//tensorstore/util:status",
-        "//tensorstore/util:str_cat",
         "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/strings:str_format",
     ],
 )
 
@@ -726,10 +728,13 @@ tensorstore_cc_library(
     deps = [
         ":dimension_index_buffer",
         ":index_transform",
+        ":output_index_method",
+        "//tensorstore:container_kind",
+        "//tensorstore:index",
         "//tensorstore:rank",
         "//tensorstore/util:result",
-        "//tensorstore/util:str_cat",
         "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/strings:str_format",
     ],
 )
 
@@ -841,6 +846,7 @@ tensorstore_cc_test(
         "//tensorstore/util:span",
         "//tensorstore/util:status_testutil",
         "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/strings",
         "@googletest//:gtest_main",
     ],
 )

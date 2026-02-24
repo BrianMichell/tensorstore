@@ -88,6 +88,7 @@ tensorstore_cc_test(
         "//tensorstore:contiguous_layout",
         "//tensorstore:data_type",
         "//tensorstore:index",
+        "//tensorstore:json_serialization_options_base",
         "//tensorstore:open",
         "//tensorstore:open_mode",
         "//tensorstore:open_options",

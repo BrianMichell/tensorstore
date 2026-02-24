@@ -94,6 +94,7 @@
 #include "tensorstore/serialization/fwd.h"  // IWYU pragma: keep
 #include "tensorstore/serialization/std_optional.h"  // IWYU pragma: keep
 #include "tensorstore/util/garbage_collection/std_optional.h"  // IWYU pragma: keep
+#include "tensorstore/util/status_builder.h"
 
 // GCS reference links are:
 //
@@ -419,14 +420,13 @@ class GcsKeyValueStore
   template <typename Task>
   absl::Status BackoffForAttemptAsync(
       absl::Status status, int attempt, Task* task,
-      SourceLocation loc = ::tensorstore::SourceLocation::current()) {
+      SourceLocation loc = SourceLocation::current()) {
     assert(task != nullptr);
     auto delay = spec_.retries->BackoffForAttempt(attempt);
     if (!delay) {
-      return MaybeAnnotateStatus(std::move(status),
-                                 absl::StrFormat("All %d retry attempts failed",
-                                                 spec_.retries->max_retries),
-                                 absl::StatusCode::kAborted, loc);
+      return StatusBuilder(std::move(status))
+          .SetCode(absl::StatusCode::kAborted)
+          .Format("All %d retry attempts failed", spec_.retries->max_retries);
     }
 
     gcs_metrics.retries.Increment();

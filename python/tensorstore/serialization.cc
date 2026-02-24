@@ -405,8 +405,11 @@ class PickleDecodeSource final : public serialization::DecodeSource {
           PickleDecodeImpl(data.python_object,
                            [&](serialization::DecodeSource& source) {
                              return decode(source, data.cpp_object);
-                           }),
-          (Fail(_), false));
+                           }))
+          .With([this](absl::Status s) {
+            Fail(std::move(s));
+            return false;
+          });
       data.type_info = &type;
       data.python_object = {};
     }

@@ -45,6 +45,7 @@
 #include "tensorstore/internal/riegeli/find.h"
 #include "tensorstore/util/result.h"
 #include "tensorstore/util/status.h"
+#include "tensorstore/util/status_builder.h"
 #include "tensorstore/util/str_cat.h"
 
 namespace tensorstore {
@@ -413,8 +414,8 @@ std::variant<absl::Status, int64_t> TryReadFullEOCD(riegeli::Reader& reader,
 
   if (!reader.Seek(eocd_start - ZipEOCD64Locator::kRecordSize)) {
     if (!reader.ok() && !reader.status().ok()) {
-      return MaybeAnnotateStatus(reader.status(),
-                                 "Failed to read EOCD64 Locator");
+      return StatusBuilder(reader.status())
+          .Format("Failed to read EOCD64 Locator");
     }
     return absl::InvalidArgumentError("Failed to read EOCD64 Locator");
   }
@@ -439,7 +440,7 @@ std::variant<absl::Status, int64_t> TryReadFullEOCD(riegeli::Reader& reader,
   }
   if (!reader.Seek(target_pos)) {
     if (!reader.ok() && !reader.status().ok()) {
-      return MaybeAnnotateStatus(reader.status(), "Failed to read EOCD64");
+      return StatusBuilder(reader.status()).Format("Failed to read EOCD64");
     }
     return absl::InvalidArgumentError("Failed to read EOCD64");
   }

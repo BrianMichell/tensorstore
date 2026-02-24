@@ -29,6 +29,7 @@ tensorstore_cc_library(
         "//tensorstore:context",
         "//tensorstore:open_mode",
         "//tensorstore:open_options",
+        "//tensorstore:schema",
         "//tensorstore:spec",
         "//tensorstore:transaction",
         "//tensorstore/driver",

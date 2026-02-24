@@ -22,6 +22,8 @@
 #include "tensorstore/index.h"
 #include "tensorstore/internal/poly/poly.h"
 #include "tensorstore/util/future.h"
+#include "tensorstore/util/result.h"
+#include "tensorstore/util/status_builder.h"
 
 namespace tensorstore {
 

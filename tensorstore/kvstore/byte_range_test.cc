@@ -31,7 +31,6 @@ namespace {
 using ::tensorstore::ByteRange;
 using ::tensorstore::OptionalByteRangeRequest;
 using ::tensorstore::StatusIs;
-using ::tensorstore::StrCat;
 using ::tensorstore::internal::GetSubCord;
 using ::tensorstore::serialization::TestSerializationRoundTrip;
 using ::testing::HasSubstr;
@@ -130,8 +129,8 @@ TEST(OptionalByteRangeRequestTest, SatisfiesInvariants) {
 }
 
 TEST(OptionalByteRangeRequestTest, Ostream) {
-  EXPECT_EQ("[5, 10)", StrCat(OptionalByteRangeRequest(5, 10)));
-  EXPECT_EQ("[5, ?)", StrCat(OptionalByteRangeRequest(5)));
+  EXPECT_EQ("[5, 10)", absl::StrCat(OptionalByteRangeRequest(5, 10)));
+  EXPECT_EQ("[5, ?)", absl::StrCat(OptionalByteRangeRequest(5)));
 }
 
 TEST(OptionalByteRangeRequestTest, Validate) {

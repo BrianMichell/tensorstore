@@ -50,6 +50,7 @@
 #include "tensorstore/util/result.h"
 #include "tensorstore/util/span.h"
 #include "tensorstore/util/status.h"
+#include "tensorstore/util/status_builder.h"
 #include "tensorstore/util/str_cat.h"
 
 namespace tensorstore {
@@ -168,14 +169,18 @@ Result<ZarrArrayToBytesCodecSpec::Ptr> GetDefaultArrayToBytesCodecSpec(
       "No default codec defined for data type %v", decoded.dtype));
 }
 
-absl::Status CodecResolveError(const ZarrCodecSpec& codec_spec,
-                               std::string_view message,
-                               const absl::Status& status) {
-  return tensorstore::MaybeAnnotateStatus(
-      status, absl::StrFormat(
-                  "Error %s through codec %s", message,
-                  jb::ToJson(&codec_spec, ZarrCodecJsonBinder).value().dump()));
-}
+struct CodecResolveErrorBuilder {
+  const ZarrCodecSpec& codec_spec;
+  std::string_view message;
+
+  template <typename SB>
+  absl::Status operator()(SB&& sb) const {
+    return sb.Format(
+        "Error %s through codec %s", message,
+        jb::ToJson(&codec_spec, ZarrCodecJsonBinder).value().dump());
+  }
+};
+
 }  // namespace
 
 size_t ZarrCodecChainSpec::sharding_height() const {
@@ -192,10 +197,10 @@ absl::Status ZarrCodecChainSpec::GetDecodedChunkLayout(
   for (size_t i = 0; i < array_to_array.size(); ++i) {
     const auto& codec_spec = *array_to_array[i];
     auto& encoded_array_info = array_infos[i];
-    TENSORSTORE_RETURN_IF_ERROR(
-        codec_spec.PropagateDataTypeAndShape(*decoded_array_info,
-                                             encoded_array_info),
-        CodecResolveError(codec_spec, "propagating data type and shape", _));
+    TENSORSTORE_RETURN_IF_ERROR(codec_spec.PropagateDataTypeAndShape(
+                                    *decoded_array_info, encoded_array_info))
+        .With(CodecResolveErrorBuilder{codec_spec,
+                                       "propagating data type and shape"});
     decoded_array_info = &encoded_array_info;
   }
   std::optional<ArrayCodecChunkLayoutInfo> temp_info[2];
@@ -205,8 +210,10 @@ absl::Status ZarrCodecChainSpec::GetDecodedChunkLayout(
     TENSORSTORE_RETURN_IF_ERROR(
         array_to_bytes->GetDecodedChunkLayout(
             array_infos.empty() ? array_info : array_infos.back(),
-            decoded_info),
-        CodecResolveError(*array_to_bytes, "propagating chunk layout", _));
+            decoded_info))
+        .With(CodecResolveErrorBuilder{*array_to_bytes,
+                                       "propagating chunk layout"});
+
     encoded_info = &decoded_info;
   } else if (!array_to_array.empty()) {
     encoded_info = &temp_info[0].emplace();
@@ -215,11 +222,11 @@ absl::Status ZarrCodecChainSpec::GetDecodedChunkLayout(
     auto& decoded_info =
         i == 0 ? decoded : temp_info[(array_to_array.size() - i) % 2].emplace();
     const auto& codec_spec = *array_to_array[i];
-    TENSORSTORE_RETURN_IF_ERROR(
-        codec_spec.GetDecodedChunkLayout(
-            array_infos[i], *encoded_info,
-            i == 0 ? array_info : array_infos[i - 1], decoded_info),
-        CodecResolveError(codec_spec, "propagating chunk layout", _));
+    TENSORSTORE_RETURN_IF_ERROR(codec_spec.GetDecodedChunkLayout(
+                                    array_infos[i], *encoded_info,
+                                    i == 0 ? array_info : array_infos[i - 1],
+                                    decoded_info))
+        .With(CodecResolveErrorBuilder{codec_spec, "propagating chunk layout"});
     encoded_info = &decoded_info;
   }
   return absl::OkStatus();
@@ -258,7 +265,7 @@ ZarrCodecChainSpec::Resolve(ArrayCodecResolveParameters&& decoded,
                            resolved_spec
                                ? &resolved_spec->array_to_array.emplace_back()
                                : nullptr),
-        CodecResolveError(codec_spec, "resolving codec spec", _));
+        _.With(CodecResolveErrorBuilder{codec_spec, "resolving codec spec"}));
     chain->array_to_array.push_back(std::move(codec));
     decoded_params = &encoded_params;
     return absl::OkStatus();
@@ -307,7 +314,8 @@ ZarrCodecChainSpec::Resolve(ArrayCodecResolveParameters&& decoded,
       array_to_bytes_codec_ptr->Resolve(
           std::move(*decoded_params), *bytes_decoded_params,
           resolved_spec ? &resolved_spec->array_to_bytes : nullptr),
-      CodecResolveError(*array_to_bytes, "resolving codec spec", _));
+      _.With(
+          CodecResolveErrorBuilder{*array_to_bytes, "resolving codec spec"}));
 
   if (chain->array_to_bytes->is_sharding_codec() && !bytes_to_bytes.empty()) {
     return absl::InvalidArgumentError(absl::StrFormat(
@@ -332,7 +340,7 @@ ZarrCodecChainSpec::Resolve(ArrayCodecResolveParameters&& decoded,
                            resolved_spec
                                ? &resolved_spec->bytes_to_bytes.emplace_back()
                                : nullptr),
-        CodecResolveError(codec_spec, "resolving codec spec", _));
+        _.With(CodecResolveErrorBuilder{codec_spec, "resolving codec spec"}));
     bytes_decoded_params = &encoded_params;
     chain->bytes_to_bytes.push_back(std::move(codec));
   }
@@ -419,6 +427,7 @@ absl::Status MergeZarrCodecSpecs(std::vector<T>& targets,
     }
   }
   if (size_mismatch) {
+    // TODO: StatusBuilder
     return tensorstore::MaybeAnnotateStatus(
         absl::FailedPreconditionError(absl::StrFormat(
             "Mismatch in number of %s codecs (%d vs %d)",

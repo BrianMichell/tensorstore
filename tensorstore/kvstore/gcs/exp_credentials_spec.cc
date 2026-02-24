@@ -87,7 +87,7 @@ using MaybeConst =
 // The PartialBinder for ExperimentalGcsGrpcCredentialsSpec looks at the
 // "type" member and then invokes the credential-specific binder.
 const auto kPartialBinder = [](auto is_loading, const auto& options, auto* obj,
-                               nlohmann::json::object_t* j) {
+                               nlohmann::json::object_t* j) -> absl::Status {
   // This uses a custom variant binder, so extract the credential type
   // first before using std::visit for the credential-specific binding.
   std::string credentials;
@@ -357,7 +357,8 @@ MakeGrpcAuthenticationStrategy(const Spec& spec, CaInfo ca_info) {
       ::nlohmann::json::object_t j_copy = spec.base;
       Spec base;
       TENSORSTORE_RETURN_IF_ERROR(
-          kPartialBinder(std::true_type{}, jb::NoOptions{}, &base, &j_copy));
+          kPartialBinder(std::true_type{}, jb::NoOptions{}, &base, &j_copy))
+          .BuildStatus();
       TENSORSTORE_ASSIGN_OR_RETURN(
           auto base_strategy, MakeGrpcAuthenticationStrategy(base, ca_info));
 

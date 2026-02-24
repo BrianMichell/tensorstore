@@ -28,6 +28,7 @@
 #include <gtest/gtest.h>
 #include "absl/status/status.h"
 #include "absl/strings/cord.h"
+#include "absl/strings/str_cat.h"
 #include "absl/time/clock.h"
 #include <nlohmann/json.hpp>
 #include "riegeli/bytes/cord_writer.h"
@@ -84,7 +85,6 @@ using ::tensorstore::MatchesJson;
 using ::tensorstore::Schema;
 using ::tensorstore::StatusIs;
 using ::tensorstore::StorageGeneration;
-using ::tensorstore::StrCat;
 using ::tensorstore::TimestampedStorageGeneration;
 using ::tensorstore::Unit;
 using ::tensorstore::internal::GetMap;
@@ -1421,7 +1421,7 @@ TENSORSTORE_GLOBAL_INITIALIZER {
       const auto [x_size, y_size, z_size, c_size] = shape;
       tensorstore::internal::TensorStoreDriverBasicFunctionalityTestOptions
           options;
-      options.test_name = tensorstore::StrCat(
+      options.test_name = absl::StrCat(
           "neuroglancer_precomputed", "/sharding=", sharding_name,
           "/shape=", x_size, ",", y_size, ",", z_size, ",", c_size);
       options.create_spec = {

@@ -164,8 +164,10 @@ void KvsBackedTestCache::TransactionNode::DoApply(ApplyOptions options,
       encoded = *static_cast<const absl::Cord*>(read_state.data.get());
     }
     for (const auto& validator : validators) {
-      TENSORSTORE_RETURN_IF_ERROR(validator(encoded),
-                                  execution::set_error(receiver, _));
+      TENSORSTORE_RETURN_IF_ERROR(validator(encoded))
+          .With([&](absl::Status status) {
+            execution::set_error(receiver, std::move(status));
+          });
     }
     if (cleared) {
       encoded = absl::Cord();

@@ -43,10 +43,8 @@ CodecSpecRegistry& GetCodecSpecRegistry() {
 
 absl::Status CodecDriverSpec::MergeFrom(const CodecSpec& other) {
   if (!other) return absl::OkStatus();
-  TENSORSTORE_RETURN_IF_ERROR(
-      this->DoMergeFrom(*other),
-      internal::StatusBuilder(_).Format("Cannot merge codec spec %v with %v",
-                                        CodecSpec(this), other));
+  TENSORSTORE_RETURN_IF_ERROR(this->DoMergeFrom(*other))
+      .Format("Cannot merge codec spec %v with %v", CodecSpec(this), other);
   return absl::OkStatus();
 }
 

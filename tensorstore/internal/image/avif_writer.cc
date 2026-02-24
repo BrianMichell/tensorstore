@@ -36,6 +36,7 @@
 #include "tensorstore/internal/image/image_view.h"
 #include "tensorstore/util/span.h"
 #include "tensorstore/util/status.h"
+#include "tensorstore/util/status_builder.h"
 #include "tensorstore/util/str_cat.h"
 
 // Include libavif last
@@ -249,7 +250,7 @@ absl::Status AvifFinish(avifEncoder* encoder, riegeli::Writer* writer) {
             avifRWDataFree(&avif_output);
           },
           buffer))) {
-    return MaybeAnnotateStatus(writer->status(), "Encoding AVIF");
+    return StatusBuilder(writer->status()).Format("Encoding AVIF");
   }
   return absl::OkStatus();
 }

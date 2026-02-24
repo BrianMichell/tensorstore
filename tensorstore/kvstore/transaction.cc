@@ -49,6 +49,7 @@
 #include "tensorstore/kvstore/key_range.h"
 #include "tensorstore/kvstore/operations.h"
 #include "tensorstore/kvstore/read_modify_write.h"
+#include "tensorstore/kvstore/read_result.h"
 #include "tensorstore/transaction.h"
 #include "tensorstore/util/execution/any_receiver.h"
 #include "tensorstore/util/execution/execution.h"
@@ -769,9 +770,10 @@ void RequestWritebackForRead(
               std::memory_order_relaxed);
         }
       }
-      TENSORSTORE_RETURN_IF_ERROR(
-          ApplyByteRange(read_result, byte_range_),
-          execution::set_error(receiver_, std::move(_)));
+      TENSORSTORE_RETURN_IF_ERROR(ApplyByteRange(read_result, byte_range_))
+          .With([&](absl::Status error) {
+            execution::set_error(receiver_, std::move(error));
+          });
       execution::set_value(receiver_, std::move(read_result));
     }
     void set_error(absl::Status error) {
@@ -2104,8 +2106,10 @@ class WriteViaExistingTransactionNode : public internal::TransactionState::Node,
 
       if (options.generation_conditions.Matches(read_result.stamp.generation)) {
         TENSORSTORE_RETURN_IF_ERROR(
-            ApplyByteRange(read_result, options.byte_range),
-            execution::set_error(receiver, std::move(_)));
+            ApplyByteRange(read_result, options.byte_range))
+            .With([&](absl::Status error) {
+              execution::set_error(receiver, std::move(error));
+            });
       } else {
         read_result.state = ReadResult::State::kUnspecified;
         read_result.value.Clear();
@@ -2163,8 +2167,10 @@ class WriteViaExistingTransactionNode : public internal::TransactionState::Node,
               read_result.state = ReadResult::kUnspecified;
             } else {
               TENSORSTORE_RETURN_IF_ERROR(
-                  ApplyByteRange(read_result, byte_range_),
-                  execution::set_error(receiver_, std::move(_)));
+                  ApplyByteRange(read_result, byte_range_))
+                  .With([&](absl::Status error) {
+                    execution::set_error(receiver_, std::move(error));
+                  });
             }
           } else {
             // Read generation does not match.  Since the constraint was

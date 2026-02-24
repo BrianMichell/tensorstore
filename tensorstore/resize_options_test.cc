@@ -22,12 +22,11 @@ namespace {
 
 using ::tensorstore::ResizeMode;
 using ::tensorstore::ResolveBoundsMode;
-using ::tensorstore::StrCat;
 
 TEST(ResolveBoundsModeTest, PrintToOstream) {
   EXPECT_EQ("fix_resizable_bounds",
-            StrCat(ResolveBoundsMode::fix_resizable_bounds));
-  EXPECT_EQ("", StrCat(ResolveBoundsMode{}));
+            tensorstore::StrCat(ResolveBoundsMode::fix_resizable_bounds));
+  EXPECT_EQ("", tensorstore::StrCat(ResolveBoundsMode{}));
 }
 
 TEST(ResolveBoundsModeTest, BitwiseOr) {
@@ -40,9 +39,10 @@ TEST(ResolveBoundsModeTest, BitwiseOr) {
 TEST(ResizeModeTest, PrintToOstream) {
   EXPECT_EQ(
       "resize_metadata_only|resize_tied_bounds|expand_only|shrink_only",
-      StrCat(ResizeMode::resize_metadata_only | ResizeMode::resize_tied_bounds |
-             ResizeMode::expand_only | ResizeMode::shrink_only));
-  EXPECT_EQ("", StrCat(ResizeMode{}));
+      tensorstore::StrCat(ResizeMode::resize_metadata_only |
+                          ResizeMode::resize_tied_bounds |
+                          ResizeMode::expand_only | ResizeMode::shrink_only));
+  EXPECT_EQ("", tensorstore::StrCat(ResizeMode{}));
 }
 
 TEST(ResizeModeTest, BitwiseOr) {

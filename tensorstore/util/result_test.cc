@@ -1026,7 +1026,7 @@ TEST(ResultTest, MakeResult) {
 }
 
 TEST(ResultTest, AssignOrReturn) {
-  const auto Helper = [](Result<int> r) {
+  const auto Helper = [](Result<int> r) -> absl::Status {
     TENSORSTORE_ASSIGN_OR_RETURN(auto x, r);
     static_assert(std::is_same_v<decltype(x), int>);
     EXPECT_EQ(3, x);
@@ -1039,9 +1039,8 @@ TEST(ResultTest, AssignOrReturn) {
 }
 
 TEST(ResultTest, AssignOrReturnAnnotate) {
-  const auto Helper = [](Result<int> r) {
-    TENSORSTORE_ASSIGN_OR_RETURN(
-        auto x, r, tensorstore::MaybeAnnotateStatus(_, "Annotated"));
+  const auto Helper = [](Result<int> r) -> absl::Status {
+    TENSORSTORE_ASSIGN_OR_RETURN(auto x, r, _.SetPrepend().Format("Annotated"));
     static_assert(std::is_same_v<decltype(x), int>);
     EXPECT_EQ(3, x);
     return absl::UnknownError("No error");

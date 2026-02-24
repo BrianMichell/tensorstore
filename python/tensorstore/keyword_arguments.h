@@ -60,7 +60,7 @@
 #include "absl/strings/str_split.h"
 #include "python/tensorstore/status.h"
 #include "python/tensorstore/type_name_override.h"  // IWYU pragma: keep
-#include "tensorstore/util/status.h"
+#include "tensorstore/util/status_builder.h"
 #include "tensorstore/util/str_cat.h"
 
 namespace tensorstore {
@@ -167,8 +167,8 @@ void SetKeywordArgumentOrThrow(Target& target, KeywordArgument<ParamDef>& arg) {
       target,
       pybind11::detail::cast_op<typename ParamDef::type&&>(std::move(caster)));
   if (!status.ok()) {
-    ThrowStatusException(MaybeAnnotateStatus(
-        status, absl::StrFormat("Invalid %s", ParamDef::name)));
+    ThrowStatusException(
+        StatusBuilder(std::move(status)).Format("Invalid %s", ParamDef::name));
   }
 }
 

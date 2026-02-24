@@ -680,8 +680,10 @@ class BtreeWriterCommitOperation : public BtreeWriterCommitOperationBase {
           ValidateBtreeNodeReference(
               *node, params.parent_state->height_ - 1,
               std::string_view(params.inclusive_min_key_suffix)
-                  .substr(params.subtree_common_prefix_length)),
-          static_cast<void>(SetDeferredResult(promise, _)));
+                  .substr(params.subtree_common_prefix_length)))
+          .With([&](const absl::Status& status) {
+            SetDeferredResult(promise, std::move(status));
+          });
       auto full_prefix = tensorstore::StrCat(
           params.parent_state->existing_subtree_key_prefix_,
           std::string_view(params.inclusive_min_key_suffix)

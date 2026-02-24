@@ -235,10 +235,7 @@ Result<BtreeNode> DecodeBtreeNode(const absl::Cord& encoded,
               reader, data_file_table, num_entries, node);
         }
       });
-  if (!status.ok()) {
-    return tensorstore::MaybeAnnotateStatus(status,
-                                            "Error decoding b-tree node");
-  }
+  TENSORSTORE_RETURN_IF_ERROR(status).Format("Error decoding b-tree node");
 #ifndef NDEBUG
   CheckBtreeNodeInvariants(node);
 #endif

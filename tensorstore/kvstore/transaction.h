@@ -88,6 +88,7 @@
 #include <stdint.h>
 
 #include <atomic>
+#include <cassert>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -855,14 +856,14 @@ Future<TimestampedStorageGeneration> WriteViaTransaction(
 ///
 ///     MutationEntry &entry = ...;
 ///     TENSORSTORE_KVSTORE_DEBUG_LOG(entry, "Information", to, "include");
-#define TENSORSTORE_KVSTORE_DEBUG_LOG(...)                    \
-  do {                                                        \
-    tensorstore::internal_kvstore::KvstoreDebugLog(           \
-        tensorstore::SourceLocation::current(), __VA_ARGS__); \
+#define TENSORSTORE_KVSTORE_DEBUG_LOG(...)                                    \
+  do {                                                                        \
+    tensorstore::internal_kvstore::KvstoreDebugLog(SourceLocation::current(), \
+                                                   __VA_ARGS__);              \
   } while (false)
 
 template <typename... T>
-void KvstoreDebugLog(tensorstore::SourceLocation loc, MutationEntry& entry,
+void KvstoreDebugLog(SourceLocation loc, MutationEntry& entry,
                      const T&... arg) {
   std::string message;
   tensorstore::StrAppend(

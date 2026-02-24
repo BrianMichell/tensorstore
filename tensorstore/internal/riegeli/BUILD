@@ -177,7 +177,6 @@ tensorstore_cc_test(
         ":json_input",
         ":json_output",
         "//tensorstore/internal/testing:json_gtest",
-        "//tensorstore/util:status_testutil",
         "@googletest//:gtest_main",
         "@nlohmann_json//:json",
         "@riegeli//riegeli/bytes:string_reader",

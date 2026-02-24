@@ -40,6 +40,7 @@
 #include "tensorstore/kvstore/url_registry.h"
 #include "tensorstore/open_mode.h"
 #include "tensorstore/open_options.h"
+#include "tensorstore/schema.h"
 #include "tensorstore/spec.h"
 #include "tensorstore/transaction.h"
 #include "tensorstore/util/executor.h"
@@ -209,13 +210,16 @@ struct AutoOpenState {
             internal::GetTransformedDriverKvStoreAdapterSpecFromUrl(
                 match.scheme, std::move(wrapped_base)),
             static_cast<void>(promise.SetResult(std::move(_))));
+        TENSORSTORE_RETURN_IF_ERROR(internal::TransformAndApplyOptions(
+                                        spec, std::move(self_ref.spec_options)))
+            .With([&](absl::Status error) {
+              promise.SetResult(std::move(error));
+            });
         TENSORSTORE_RETURN_IF_ERROR(
-            internal::TransformAndApplyOptions(
-                spec, std::move(self_ref.spec_options)),
-            static_cast<void>(promise.SetResult(std::move(_))));
-        TENSORSTORE_RETURN_IF_ERROR(
-            DriverSpecBindContext(spec.driver_spec, self_ref.context),
-            static_cast<void>(promise.SetResult(std::move(_))));
+            DriverSpecBindContext(spec.driver_spec, self_ref.context))
+            .With([&](absl::Status error) {
+              promise.SetResult(std::move(error));
+            });
         LinkResult(std::move(promise),
                    internal::OpenDriver(std::move(spec),
                                         std::move(self->driver_open_request)));

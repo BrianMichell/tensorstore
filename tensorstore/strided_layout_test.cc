@@ -62,7 +62,6 @@ using ::tensorstore::offset_origin;
 using ::tensorstore::StaticCast;
 using ::tensorstore::StaticRankCast;
 using ::tensorstore::StatusIs;
-using ::tensorstore::StrCat;
 using ::tensorstore::StridedLayout;
 using ::tensorstore::StridedLayoutView;
 using ::tensorstore::unchecked;
@@ -965,14 +964,14 @@ TEST(StridedLayoutTest, PrintToOstream) {
   auto layout = StridedLayout(ContiguousLayoutOrder::fortran, 2, {3, 4, 5});
   EXPECT_EQ(
       "{domain={origin={0, 0, 0}, shape={3, 4, 5}}, byte_strides={2, 6, 24}}",
-      StrCat(layout));
+      tensorstore::StrCat(layout));
 }
 
 TEST(StridedLayoutViewTest, PrintToOstream) {
   auto layout = StridedLayout(ContiguousLayoutOrder::fortran, 2, {3, 4, 5});
   EXPECT_EQ(
       "{domain={origin={0, 0, 0}, shape={3, 4, 5}}, byte_strides={2, 6, 24}}",
-      StrCat(StridedLayoutView<>(layout)));
+      tensorstore::StrCat(StridedLayoutView<>(layout)));
 }
 
 TEST(StridedLayoutTest, Domain) {
@@ -1142,8 +1141,8 @@ TEST(StridedLayoutTest, DynamicLayoutCastNoOp) {
 }
 
 TEST(ArrayOriginKindTest, PrintToOstream) {
-  EXPECT_EQ("zero", StrCat(zero_origin));
-  EXPECT_EQ("offset", StrCat(offset_origin));
+  EXPECT_EQ("zero", tensorstore::StrCat(zero_origin));
+  EXPECT_EQ("offset", tensorstore::StrCat(offset_origin));
 }
 
 TEST(StridedLayoutTest, IsContiguousLayout) {

@@ -233,15 +233,19 @@ void GetStorageStatisticsForRegularGridWithSemiLexicographicalKeys(
   TENSORSTORE_RETURN_IF_ERROR(
       internal_grid_partition::PrePartitionIndexTransformOverGrid(
           handler->full_transform, handler->grid_output_dimensions,
-          output_to_grid_cell, handler->grid_partition),
-      handler->state->SetError(_));
+          output_to_grid_cell, handler->grid_partition))
+      .With([&](absl::Status status) {
+        handler->state->SetError(std::move(status));
+      });
 
   TENSORSTORE_RETURN_IF_ERROR(
       internal::GetChunkKeyRangesForRegularGridWithSemiLexicographicalKeys(
           handler->grid_partition, handler->full_transform,
           handler->grid_output_dimensions, output_to_grid_cell, grid_bounds,
-          *handler->key_formatter, handle_key, handle_key_range),
-      handler->state->SetError(_));
+          *handler->key_formatter, handle_key, handle_key_range))
+      .With([&](absl::Status status) {
+        handler->state->SetError(std::move(status));
+      });
 
   handler->state->total_chunks += total_chunks;
 }

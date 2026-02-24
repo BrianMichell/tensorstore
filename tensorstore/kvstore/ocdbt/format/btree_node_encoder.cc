@@ -315,9 +315,8 @@ Result<EncodedNode> EncodeEntries(
         return EncodeEntriesInner<Entry>(writer, height, existing_prefix,
                                          entries, is_root, encoded.info);
       });
-  TENSORSTORE_ASSIGN_OR_RETURN(
-      encoded.encoded_node, std::move(result),
-      tensorstore::MaybeAnnotateStatus(_, "Error encoding b-tree node"));
+  TENSORSTORE_ASSIGN_OR_RETURN(encoded.encoded_node, std::move(result),
+                               _.Format("Error encoding b-tree node"));
   encoded.info.statistics.num_tree_bytes += encoded.encoded_node.size();
   return encoded;
 }

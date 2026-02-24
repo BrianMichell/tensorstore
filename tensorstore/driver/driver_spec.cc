@@ -308,7 +308,7 @@ TENSORSTORE_DEFINE_JSON_BINDER(
                                : static_cast<DimensionIndex>(
                                      obj.driver_spec->schema.rank());
                   },
-                  [](const auto& obj, DimensionIndex rank) {
+                  [](const auto& obj, DimensionIndex rank) -> absl::Status {
                     if (rank != dynamic_rank) {
                       if (obj.transform.valid()) {
                         if (obj.transform.input_rank() != rank) {

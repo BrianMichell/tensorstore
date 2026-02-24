@@ -26,6 +26,7 @@
 #include "absl/base/call_once.h"
 #include "absl/base/optimization.h"
 #include "absl/status/status.h"
+#include "absl/strings/str_format.h"
 #include <nlohmann/json_fwd.hpp>
 #include "tensorstore/data_type.h"
 #include "tensorstore/index.h"
@@ -231,19 +232,20 @@ Result<ZarrDType> ParseDTypeNoDerived(const nlohmann::json& value) {
             x,
             [&](ptrdiff_t size) {
               if (size < 2 || size > 3) {
-                return absl::InvalidArgumentError(tensorstore::StrCat(
-                    "Expected array of size 2 or 3, but received: ", x.dump()));
+                return absl::InvalidArgumentError(absl::StrFormat(
+                    "Expected array of size 2 or 3, but received: %s",
+                    x.dump()));
               }
               return absl::OkStatus();
             },
-            [&](const ::nlohmann::json& v, ptrdiff_t i) {
+            [&](const ::nlohmann::json& v, ptrdiff_t i) -> absl::Status {
               switch (i) {
                 case 0:
                   if (internal_json::JsonRequireValueAs(v, &field.name).ok()) {
                     if (!field.name.empty()) return absl::OkStatus();
                   }
-                  return absl::InvalidArgumentError(tensorstore::StrCat(
-                      "Expected non-empty string, but received: ", v.dump()));
+                  return absl::InvalidArgumentError(absl::StrFormat(
+                      "Expected non-empty string, but received: %s", v.dump()));
                 case 1: {
                   std::string dtype_string;
                   TENSORSTORE_RETURN_IF_ERROR(

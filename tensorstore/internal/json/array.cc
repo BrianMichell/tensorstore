@@ -170,19 +170,17 @@ Result<SharedArray<void>> JsonParseNestedArrayImpl(
       // The new element is not an array: handle leaf case.
       if (!array.data()) allocate_array();
       if (nesting_level != array.rank()) {
-        return absl::InvalidArgumentError(absl::StrFormat(
-            "Expected rank-%d array, but found non-array "
-            "element %s at position "
-            "%s.",
-            array.rank(), j->dump(),
-            absl::FormatStreamed(span(&shape_or_position[0], nesting_level))));
+        return absl::InvalidArgumentError(
+            absl::StrFormat("Expected rank-%d array, but found non-array "
+                            "element %s at position %s.",
+                            array.rank(), j->dump(),
+                            absl::FormatStreamed(tensorstore::span(
+                                &shape_or_position[0], nesting_level))));
       }
-      TENSORSTORE_RETURN_IF_ERROR(
-          decode_element(*j, pointer.get()),
-          MaybeAnnotateStatus(
-              _, absl::StrFormat("Error parsing array element at position %s",
-                                 absl::FormatStreamed(span(
-                                     &shape_or_position[0], nesting_level)))));
+      TENSORSTORE_RETURN_IF_ERROR(decode_element(*j, pointer.get()))
+          .Format("Error parsing array element at position %s",
+                  absl::FormatStreamed(
+                      tensorstore::span(&shape_or_position[0], nesting_level)));
       pointer += byte_stride;
     } else {
       // The new element is an array: handle another nesting level.

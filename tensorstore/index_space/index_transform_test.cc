@@ -40,6 +40,7 @@
 #include "tensorstore/util/result.h"
 #include "tensorstore/util/span.h"
 #include "tensorstore/util/status_testutil.h"
+#include "tensorstore/util/str_cat.h"
 
 namespace {
 
@@ -68,7 +69,6 @@ using ::tensorstore::span;
 using ::tensorstore::StaticCast;
 using ::tensorstore::StaticRankCast;
 using ::tensorstore::StatusIs;
-using ::tensorstore::StrCat;
 using ::tensorstore::unchecked;
 using ::tensorstore::view;
 using ::tensorstore::internal::ComputeInputDimensionReferenceCounts;
@@ -315,7 +315,7 @@ TEST(IndexTransformTest, Assign) {
 
 TEST(IndexTransformTest, ToString) {
   EXPECT_EQ("<Invalid index space transform>",
-            StrCat(IndexTransformView<1, 1>()));
+            tensorstore::StrCat(IndexTransformView<1, 1>()));
   EXPECT_EQ(
       R"s(Rank 3 -> 4 index space transform:
   Input domain:
@@ -329,20 +329,20 @@ TEST(IndexTransformTest, ToString) {
     out[3] = 7 + 9 * bounded([0, 4), array(in)), where array =
       {{{1, 0, 2, 2}}}
 )s",
-      StrCat(IndexTransformBuilder<>(3, 4)
-                 .input_origin({1, 2, 3})
-                 .input_shape({2, 2, 4})
-                 .implicit_lower_bounds({1, 0, 0})
-                 .implicit_upper_bounds({0, 1, 0})
-                 .input_labels({"x", "y", "z"})
-                 .output_constant(0, 4)
-                 .output_single_input_dimension(1, 5, 7, 2)
-                 .output_constant(2, 6)
-                 .output_index_array(3, 7, 9,
-                                     MakeArray<Index>({{{1, 0, 2, 2}}}),
-                                     IndexInterval::Closed(0, 3))
-                 .Finalize()
-                 .value()));
+      tensorstore::StrCat(
+          IndexTransformBuilder<>(3, 4)
+              .input_origin({1, 2, 3})
+              .input_shape({2, 2, 4})
+              .implicit_lower_bounds({1, 0, 0})
+              .implicit_upper_bounds({0, 1, 0})
+              .input_labels({"x", "y", "z"})
+              .output_constant(0, 4)
+              .output_single_input_dimension(1, 5, 7, 2)
+              .output_constant(2, 6)
+              .output_index_array(3, 7, 9, MakeArray<Index>({{{1, 0, 2, 2}}}),
+                                  IndexInterval::Closed(0, 3))
+              .Finalize()
+              .value()));
 }
 
 // Verify that GoogleTest printing works.
@@ -663,7 +663,7 @@ TEST(IndexDomainTest, SubDomain) {
 }
 
 TEST(IndexDomainTest, PrintToOstream) {
-  EXPECT_EQ("<invalid index domain>", StrCat(IndexDomain<2>()));
+  EXPECT_EQ("<invalid index domain>", tensorstore::StrCat(IndexDomain<2>()));
   auto d2 = IndexDomainBuilder<2>()
                 .origin({1, 2})
                 .shape({3, 4})
@@ -673,7 +673,7 @@ TEST(IndexDomainTest, PrintToOstream) {
                 .Finalize()
                 .value();
 
-  EXPECT_EQ(R"({ "x": [1*, 4), "y": [2, 6*) })", StrCat(d2));
+  EXPECT_EQ(R"({ "x": [1*, 4), "y": [2, 6*) })", tensorstore::StrCat(d2));
 }
 
 static_assert(IsIndexDomain<bool> == false);

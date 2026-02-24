@@ -422,8 +422,10 @@ void WriterCommitOperation::StartCommit(DistributedBtreeWriter& writer,
             auto& config_state = *commit_op->writer_->io_handle_->config_state;
             TENSORSTORE_RETURN_IF_ERROR(
                 config_state.ValidateNewConfig(
-                    commit_op->existing_manifest_->config),
-                commit_op->CommitFailed(_));
+                    commit_op->existing_manifest_->config))
+                .With([&](absl::Status status) {
+                  commit_op->CommitFailed(std::move(status));
+                });
             commit_op->StagePending();
             TraverseBtreeStartingFromRoot(std::move(commit_op));
           }));
@@ -544,8 +546,8 @@ void WriterCommitOperation::VisitNode(VisitNodeParameters&& state,
       ValidateBtreeNodeReference(
           *node, state.node_identifier.height,
           std::string_view(state.inclusive_min_key)
-              .substr(state.subtree_common_prefix_length)),
-      state.SetError(_));
+              .substr(state.subtree_common_prefix_length)))
+      .With([&](absl::Status status) { state.SetError(std::move(status)); });
 
   span<const PendingDistributedRequests::WriteRequest> write_requests =
       state.commit_op->staged_.write_requests;

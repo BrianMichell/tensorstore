@@ -44,6 +44,7 @@
 #include "tensorstore/util/future_impl.h"
 #include "tensorstore/util/result.h"
 #include "tensorstore/util/status.h"
+#include "tensorstore/util/status_builder.h"
 #include "tensorstore/util/status_testutil.h"
 #include "tensorstore/util/str_cat.h"
 
@@ -1905,7 +1906,8 @@ TEST(MapFutureErrorTest, ErrorMappedToError) {
   auto mapped = MapFutureError(
       InlineExecutor{},
       [](absl::Status status) {
-        return tensorstore::MaybeAnnotateStatus(status, "Mapped");
+        return tensorstore::StatusBuilder(status).SetPrepend().Format("Mapped").
+        operator absl::Status();
       },
       pair.future);
   EXPECT_FALSE(mapped.ready());
@@ -1959,7 +1961,8 @@ TEST(FutureTest, SetDeferredResultSetReady) {
 // ends.
 TEST(FutureTest, ReturnIfError) {
   auto do_test = [] {
-    TENSORSTORE_RETURN_IF_ERROR(MakeReadyFuture<int>(42).result(), false);
+    TENSORSTORE_RETURN_IF_ERROR(MakeReadyFuture<int>(42).result())
+        .With([](auto&&) { return false; });
     return true;
   };
   EXPECT_EQ(true, do_test());

@@ -18,6 +18,7 @@
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
+#include "absl/strings/str_format.h"
 #include "tensorstore/array.h"
 #include "tensorstore/array_storage_statistics.h"
 #include "tensorstore/chunk_layout.h"
@@ -33,8 +34,6 @@
 
 namespace tensorstore {
 namespace internal_zarr {
-
-using tensorstore::StrCat;
 
 TEST_P(ZarrLikeStorageStatisticsTest, FullyLexicographicOrder) {
   TENSORSTORE_ASSERT_OK_AND_ASSIGN(
@@ -59,10 +58,10 @@ TEST_P(ZarrLikeStorageStatisticsTest, FullyLexicographicOrder) {
     EXPECT_THAT(mock_kvstore->request_log.pop_all(),
                 ::testing::UnorderedElementsAreArray({
                     MatchesJson({{"type", "read"},
-                                 {"key", StrCat("0", sep, "0", sep, "0")},
+                                 {"key", absl::StrFormat("0%c0%c0", sep, sep)},
                                  {"byte_range_exclusive_max", 0}}),
                     MatchesJson({{"type", "read"},
-                                 {"key", StrCat("1", sep, "0", sep, "0")},
+                                 {"key", absl::StrFormat("1%c0%c0", sep, sep)},
                                  {"byte_range_exclusive_max", 0}}),
                 }));
 
@@ -85,10 +84,10 @@ TEST_P(ZarrLikeStorageStatisticsTest, FullyLexicographicOrder) {
     EXPECT_THAT(mock_kvstore->request_log.pop_all(),
                 ::testing::UnorderedElementsAreArray({
                     MatchesJson({{"type", "read"},
-                                 {"key", StrCat("0", sep, "0", sep, "0")},
+                                 {"key", absl::StrFormat("0%c0%c0", sep, sep)},
                                  {"byte_range_exclusive_max", 0}}),
                     MatchesJson({{"type", "read"},
-                                 {"key", StrCat("1", sep, "0", sep, "0")},
+                                 {"key", absl::StrFormat("1%c0%c0", sep, sep)},
                                  {"byte_range_exclusive_max", 0}}),
                 }));
 
@@ -104,10 +103,10 @@ TEST_P(ZarrLikeStorageStatisticsTest, FullyLexicographicOrder) {
     EXPECT_THAT(mock_kvstore->request_log.pop_all(),
                 ::testing::UnorderedElementsAreArray({
                     MatchesJson({{"type", "read"},
-                                 {"key", StrCat("0", sep, "0", sep, "0")},
+                                 {"key", absl::StrFormat("0%c0%c0", sep, sep)},
                                  {"byte_range_exclusive_max", 0}}),
                     MatchesJson({{"type", "read"},
-                                 {"key", StrCat("1", sep, "0", sep, "0")},
+                                 {"key", absl::StrFormat("1%c0%c0", sep, sep)},
                                  {"byte_range_exclusive_max", 0}}),
                 }));
   }
@@ -159,7 +158,7 @@ TEST_P(ZarrLikeStorageStatisticsTest, FullyLexicographicOrder) {
     EXPECT_THAT(mock_kvstore->request_log.pop_all(),
                 ::testing::ElementsAre(
                     MatchesJson({{"type", "read"},
-                                 {"key", StrCat("1", sep, "1", sep, "1")},
+                                 {"key", absl::StrFormat("1%c1%c1", sep, sep)},
                                  {"byte_range_exclusive_max", 0}})));
   }
 
@@ -177,7 +176,7 @@ TEST_P(ZarrLikeStorageStatisticsTest, FullyLexicographicOrder) {
     EXPECT_THAT(mock_kvstore->request_log.pop_all(),
                 ::testing::ElementsAre(
                     MatchesJson({{"type", "read"},
-                                 {"key", StrCat("0", sep, "0", sep, "0")},
+                                 {"key", absl::StrFormat("0%c0%c0", sep, sep)},
                                  {"byte_range_exclusive_max", 0}})));
   }
 }

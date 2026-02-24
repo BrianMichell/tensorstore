@@ -318,8 +318,10 @@ void NodeCommitOperation::VisitNodeReference(
                                          commit_op->SetError(_));
             TENSORSTORE_RETURN_IF_ERROR(
                 ValidateBtreeNodeReference(*node, commit_op->height,
-                                           commit_op->child_inclusive_min_key),
-                commit_op->SetError(_));
+                                           commit_op->child_inclusive_min_key))
+                .With([&](absl::Status status) {
+                  commit_op->SetError(std::move(status));
+                });
             VisitNode(std::move(commit_op), *node);
           }));
 }

@@ -114,7 +114,7 @@ class N5DriverSpec
       jb::Member(
           "metadata",
           jb::Validate(
-              [](const auto& options, auto* obj) {
+              [](const auto& options, auto* obj) -> absl::Status {
                 TENSORSTORE_RETURN_IF_ERROR(obj->schema.Set(
                     obj->metadata_constraints.dtype.value_or(DataType())));
                 TENSORSTORE_RETURN_IF_ERROR(obj->schema.Set(
@@ -450,8 +450,7 @@ class N5Driver::OpenState : public N5Driver::OpenStateBase {
     TENSORSTORE_ASSIGN_OR_RETURN(
         auto metadata,
         internal_n5::GetNewMetadata(spec().metadata_constraints, spec().schema),
-        tensorstore::MaybeAnnotateStatus(
-            _, "Cannot create using specified \"metadata\" and schema"));
+        _.Format("Cannot create using specified \"metadata\" and schema"));
     return metadata;
   }
 

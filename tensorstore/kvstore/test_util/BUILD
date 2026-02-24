@@ -18,11 +18,8 @@ tensorstore_cc_library(
         "//tensorstore/util:future",
         "//tensorstore/util:result",
         "//tensorstore/util:status",
-        "@abseil-cpp//absl/functional:function_ref",
         "@abseil-cpp//absl/log:absl_log",
-        "@abseil-cpp//absl/strings",
         "@abseil-cpp//absl/time",
-        "@abseil-cpp//absl/types:compare",
         "@nlohmann_json//:json",
     ],
 )

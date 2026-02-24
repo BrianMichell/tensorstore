@@ -120,7 +120,7 @@ class ZarrDriverSpec
       jb::Member(
           "metadata",
           jb::Validate(
-              [](const auto& options, auto* obj) {
+              [](const auto& options, auto* obj) -> absl::Status {
                 TENSORSTORE_RETURN_IF_ERROR(obj->schema.Set(
                     obj->metadata_constraints.data_type.value_or(DataType())));
                 TENSORSTORE_RETURN_IF_ERROR(obj->schema.Set(
@@ -582,8 +582,7 @@ class ZarrDriver::OpenState : public ZarrDriver::OpenStateBase {
         auto metadata,
         internal_zarr3::GetNewMetadata(spec().metadata_constraints,
                                        spec().schema),
-        tensorstore::MaybeAnnotateStatus(
-            _, "Cannot create using specified \"metadata\" and schema"));
+        _.Format("Cannot create using specified \"metadata\" and schema"));
     return metadata;
   }
 
