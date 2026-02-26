@@ -64,6 +64,7 @@
 #include "tensorstore/util/quote_string.h"
 #include "tensorstore/util/result.h"
 #include "tensorstore/util/status.h"
+#include "tensorstore/util/status_builder.h"
 #include "tensorstore/util/str_cat.h"
 
 /// specializations
@@ -170,8 +171,9 @@ struct HttpKeyValueStoreSpecData {
               }))),
       jb::Member("headers",
                  jb::Projection<&HttpKeyValueStoreSpecData::headers>(
-                     jb::DefaultInitializedValue(jb::Array(jb::Validate(
-                         [](const auto& options, const std::string* x) {
+                     jb::DefaultInitializedValue(jb::Array(
+                         jb::Validate([](const auto& options,
+                                         const std::string* x) -> absl::Status {
                            TENSORSTORE_RETURN_IF_ERROR(
                                internal_http::ValidateHttpHeader(*x));
                            return absl::OkStatus();
@@ -422,10 +424,9 @@ struct ReadTask {
       // Return AbortedError, so that it doesn't get retried again somewhere
       // at a higher level.
       if (IsRetriable(status)) {
-        return MaybeAnnotateStatus(
-            std::move(status),
-            absl::StrFormat("All %d retry attempts failed", attempt),
-            absl::StatusCode::kAborted);
+        return StatusBuilder(std::move(status))
+            .SetCode(absl::StatusCode::kAborted)
+            .Format("All %d retry attempts failed", attempt);
       }
       return status;
     }

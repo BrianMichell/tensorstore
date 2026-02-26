@@ -33,6 +33,7 @@
 #include <gtest/gtest.h>
 #include "absl/random/bit_gen_ref.h"
 #include "absl/status/status.h"
+#include "absl/strings/str_cat.h"
 #include "tensorstore/box.h"
 #include "tensorstore/container_kind.h"
 #include "tensorstore/contiguous_layout.h"
@@ -102,7 +103,6 @@ using ::tensorstore::StaticCast;
 using ::tensorstore::StaticDataTypeCast;
 using ::tensorstore::StaticRankCast;
 using ::tensorstore::StatusIs;
-using ::tensorstore::StrCat;
 using ::tensorstore::StridedLayout;
 using ::tensorstore::SubArray;
 using ::tensorstore::SubArrayStaticRank;
@@ -1628,10 +1628,11 @@ TEST(ArrayOriginCastTest, OffsetOriginToZeroOriginFailure) {
   array.byte_strides()[0] = 0;
   array.origin()[0] = -kInfIndex;
   array.shape()[0] = kInfSize;
-  EXPECT_THAT(tensorstore::ArrayOriginCast<zero_origin>(array),
-              StatusIs(absl::StatusCode::kInvalidArgument,
-                       HasSubstr(StrCat("Cannot translate array with shape {",
-                                        kInfSize, "} to have zero origin."))));
+  EXPECT_THAT(
+      tensorstore::ArrayOriginCast<zero_origin>(array),
+      StatusIs(absl::StatusCode::kInvalidArgument,
+               HasSubstr(absl::StrCat("Cannot translate array with shape {",
+                                      kInfSize, "} to have zero origin."))));
 }
 
 TEST(ArrayOriginCastTest, ImplicitCaseOffsetOriginSource) {

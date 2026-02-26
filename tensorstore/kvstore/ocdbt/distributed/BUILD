@@ -171,6 +171,7 @@ tensorstore_cc_library(
         "//tensorstore/kvstore/ocdbt/format",
         "//tensorstore/util:span",
         "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/strings:str_format",
         "@riegeli//riegeli/bytes:reader",
         "@riegeli//riegeli/bytes:writer",
     ],

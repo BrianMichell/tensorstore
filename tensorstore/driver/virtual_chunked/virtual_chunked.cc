@@ -598,10 +598,9 @@ Result<internal::Driver::Handle> VirtualChunkedDriver::OpenFromSpecData(
     if (spec.schema.fill_value().valid()) {
       return absl::InvalidArgumentError("fill_value not supported");
     }
-    TENSORSTORE_RETURN_IF_ERROR(
-        internal::ChooseReadWriteChunkGrid(chunk_layout, domain.box(),
-                                           chunk_template),
-        tensorstore::MaybeAnnotateStatus(_, "Failed to compute chunk grid"));
+    TENSORSTORE_RETURN_IF_ERROR(internal::ChooseReadWriteChunkGrid(
+                                    chunk_layout, domain.box(), chunk_template))
+        .Format("Failed to compute chunk grid");
     if (auto requested_inner_order = chunk_layout.inner_order();
         requested_inner_order.valid()) {
       std::copy_n(requested_inner_order.begin(), rank, inner_order.begin());

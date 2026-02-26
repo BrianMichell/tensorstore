@@ -102,8 +102,11 @@ GetVersionTreeLeafNodeRangeContainingGeneration(
     return false;
   }
   TENSORSTORE_RETURN_IF_ERROR(
-      ValidateVersionTreeLeafNodeEntries(version_tree_arity_log2, entries),
-      reader.Fail(_), false);
+      ValidateVersionTreeLeafNodeEntries(version_tree_arity_log2, entries))
+      .With([&](absl::Status status) {
+        reader.Fail(std::move(status));
+        return false;
+      });
   return true;
 }
 
@@ -157,8 +160,11 @@ GetVersionTreeLeafNodeRangeContainingGeneration(
   }
 
   TENSORSTORE_RETURN_IF_ERROR(ValidateVersionTreeInteriorNodeEntries(
-                                  version_tree_arity_log2, height, entries),
-                              reader.Fail(_), false);
+                                  version_tree_arity_log2, height, entries))
+      .With([&](absl::Status status) {
+        reader.Fail(std::move(status));
+        return false;
+      });
   return true;
 }
 
@@ -188,10 +194,8 @@ Result<VersionTreeNode> DecodeVersionTreeNode(const absl::Cord& encoded,
               node.entries.emplace<VersionTreeNode::InteriorNodeEntries>());
         }
       });
-  if (!status.ok()) {
-    return tensorstore::MaybeAnnotateStatus(status,
-                                            "Error decoding version tree node");
-  }
+  TENSORSTORE_RETURN_IF_ERROR(status).Format(
+      "Error decoding version tree node");
 #ifndef NDEBUG
   CheckVersionTreeNodeInvariants(node);
 #endif
@@ -506,8 +510,7 @@ Result<VersionSpec> ParseVersionSpecFromUrl(std::string_view s) {
   };
   TENSORSTORE_ASSIGN_OR_RETURN(
       auto version_spec, get_result(),
-      tensorstore::MaybeAnnotateStatus(
-          _, absl::StrFormat("Invalid OCDBT version: %v", QuoteString(s))));
+      _.Format("Invalid OCDBT version: %v", tensorstore::QuoteString(s)));
   return version_spec;
 }
 

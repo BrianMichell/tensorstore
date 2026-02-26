@@ -77,6 +77,7 @@
 #include "tensorstore/util/result.h"
 #include "tensorstore/util/span.h"
 #include "tensorstore/util/status.h"
+#include "tensorstore/util/status_builder.h"
 #include "tensorstore/util/str_cat.h"
 
 // specializations
@@ -258,10 +259,11 @@ class MinishardIndexReadOperationState
       internal::IntrusivePtr<MinishardIndexReadOperationState> self,
       Request& request, Batch minishard_fetch_batch,
       Result<kvstore::ReadResult>&& result) {
-    const auto set_error = [&](absl::Status status) {
-      request.promise.SetResult(MaybeAnnotateStatus(
-          ConvertInvalidArgumentToFailedPrecondition(std::move(status)),
-          "Error retrieving shard index entry"));
+    const auto set_error = [&](auto&& builder) {
+      request.promise.SetResult(
+          std::forward<decltype(builder)>(builder)
+              .Format("Error retrieving shard index entry")
+              .With(ConvertInvalidArgumentToFailedPrecondition));
     };
     TENSORSTORE_ASSIGN_OR_RETURN(auto&& read_result, result,
                                  set_error(std::move(_)));
@@ -406,9 +408,9 @@ class MinishardIndexCache
                   result.ok()) {
                 read_data = std::make_shared<ReadData>(*std::move(result));
               } else {
-                execution::set_error(receiver,
-                                     ConvertInvalidArgumentToFailedPrecondition(
-                                         std::move(result).status()));
+                execution::set_error(
+                    receiver, ConvertInvalidArgumentToFailedPrecondition(
+                                  StatusBuilder(std::move(result).status())));
                 return;
               }
             }
@@ -501,9 +503,9 @@ class ShardedKeyValueStoreWriteCache
                   result.ok()) {
                 chunks = *std::move(result);
               } else {
-                execution::set_error(receiver,
-                                     ConvertInvalidArgumentToFailedPrecondition(
-                                         std::move(result).status()));
+                execution::set_error(
+                    receiver, ConvertInvalidArgumentToFailedPrecondition(
+                                  StatusBuilder(std::move(result).status())));
                 return;
               }
             }
@@ -563,7 +565,7 @@ class ShardedKeyValueStoreWriteCache
     void RecordEntryWritebackError(
         internal_kvstore::ReadModifyWriteEntry& entry,
         absl::Status error) override {
-      absl::MutexLock lock(&mutex_);
+      absl::MutexLock lock(mutex_);
       if (apply_status_.ok()) {
         apply_status_ = std::move(error);
       }

@@ -407,10 +407,9 @@ Result<IndexDomain<>> GetEffectiveDomain(
   }
 
   TENSORSTORE_ASSIGN_OR_RETURN(auto domain_from_metadata, builder.Finalize());
-  TENSORSTORE_ASSIGN_OR_RETURN(domain,
-                               MergeIndexDomains(domain, domain_from_metadata),
-                               tensorstore::MaybeAnnotateStatus(
-                                   _, "Mismatch between metadata and schema"));
+  TENSORSTORE_ASSIGN_OR_RETURN(
+      domain, MergeIndexDomains(domain, domain_from_metadata),
+      _.Format("Mismatch between metadata and schema"));
   return WithImplicitDimensions(domain, false, true);
   return domain;
 }
@@ -640,11 +639,9 @@ absl::Status ValidateMetadataSchema(const N5Metadata& metadata,
 
   if (auto schema_codec = schema.codec(); schema_codec.valid()) {
     auto codec = GetCodecFromMetadata(metadata);
-    TENSORSTORE_RETURN_IF_ERROR(
-        codec.MergeFrom(schema_codec),
-        internal::ConvertInvalidArgumentToFailedPrecondition(
-            tensorstore::MaybeAnnotateStatus(
-                _, "codec from metadata does not match codec in schema")));
+    TENSORSTORE_RETURN_IF_ERROR(codec.MergeFrom(schema_codec))
+        .Format("codec from metadata does not match codec in schema")
+        .With(internal::ConvertInvalidArgumentToFailedPrecondition);
   }
 
   if (schema.chunk_layout().rank() != dynamic_rank) {
@@ -665,8 +662,8 @@ absl::Status ValidateMetadataSchema(const N5Metadata& metadata,
         GetDimensionUnits(metadata.rank, metadata.units_and_resolution);
     DimensionUnitsVector schema_units_vector(schema_units);
     TENSORSTORE_RETURN_IF_ERROR(
-        MergeDimensionUnits(schema_units_vector, dimension_units),
-        internal::ConvertInvalidArgumentToFailedPrecondition(_));
+        MergeDimensionUnits(schema_units_vector, dimension_units))
+        .With(internal::ConvertInvalidArgumentToFailedPrecondition);
     if (schema_units_vector != dimension_units) {
       return absl::FailedPreconditionError(
           tensorstore::StrCat("Dimension units in metadata ",

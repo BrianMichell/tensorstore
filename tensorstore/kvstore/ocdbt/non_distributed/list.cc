@@ -161,8 +161,8 @@ struct ListOperation
       TENSORSTORE_RETURN_IF_ERROR(
           ValidateBtreeNodeReference(*node, node_height,
                                      std::string_view(inclusive_min_key)
-                                         .substr(subtree_common_prefix_length)),
-          op->SetError(_));
+                                         .substr(subtree_common_prefix_length)))
+          .With([&](absl::Status error) { op->SetError(std::move(error)); });
       auto& subtree_key_prefix = inclusive_min_key;
       subtree_key_prefix.resize(subtree_common_prefix_length);
       subtree_key_prefix += node->key_prefix;

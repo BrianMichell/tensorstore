@@ -50,6 +50,7 @@
 #include "tensorstore/util/future.h"
 #include "tensorstore/util/result.h"
 #include "tensorstore/util/status.h"
+#include "tensorstore/util/status_builder.h"
 #include "tensorstore/util/str_cat.h"
 
 namespace tensorstore {
@@ -133,8 +134,8 @@ void FinishLeaseRequest(internal::IntrusivePtr<LeaseRequestState> state,
     if (expiration_time_result.ok()) {
       expiration_time = *expiration_time_result;
     } else {
-      status = MaybeAnnotateStatus(std::move(expiration_time_result).status(),
-                                   "Invalid expiration_time");
+      status = StatusBuilder(std::move(expiration_time_result).status())
+                   .Format("Invalid expiration_time");
     }
   }
   if (!status.ok()) {

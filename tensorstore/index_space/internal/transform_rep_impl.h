@@ -15,7 +15,12 @@
 #ifndef TENSORSTORE_INDEX_SPACE_INTERNAL_TRANSFORM_REP_IMPL_H_
 #define TENSORSTORE_INDEX_SPACE_INTERNAL_TRANSFORM_REP_IMPL_H_
 
+#include <cassert>
+#include <string>
+
 #include "absl/status/status.h"
+#include "absl/strings/str_format.h"
+#include "tensorstore/box.h"
 #include "tensorstore/index.h"
 #include "tensorstore/index_interval.h"
 #include "tensorstore/index_space/internal/transform_rep.h"
@@ -63,8 +68,8 @@ absl::Status ValidateAndIntersectBounds(BoxView<> inner,
     }
   }
   if (!error.empty()) {
-    return absl::OutOfRangeError(tensorstore::StrCat(
-        "Propagated bounds are incompatible with existing bounds ", error));
+    return absl::OutOfRangeError(absl::StrFormat(
+        "Propagated bounds are incompatible with existing bounds %s", error));
   }
   return absl::OkStatus();
 }

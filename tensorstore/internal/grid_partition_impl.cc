@@ -998,11 +998,8 @@ absl::Status PrePartitionIndexTransformOverGrid(
                       index_transform.input_domain()[map.input_dimension()],
                       map.offset(), map.stride())
                       .status();
-    if (!status.ok()) {
-      return MaybeAnnotateStatus(
-          status, absl::StrFormat("Computing range of output dimension %d",
-                                  output_dim));
-    }
+    TENSORSTORE_RETURN_IF_ERROR(status).Format(
+        "Computing range of output dimension %d", output_dim);
   }
 
   // Compute the IndexTransformGridPartition structure.

@@ -1158,8 +1158,10 @@ ReadAsIndividualChunks(TensorStore<> store) {
       r->emplace_back(array, request_transform);
       TENSORSTORE_RETURN_IF_ERROR(
           internal::CopyReadChunk(chunk.impl, std::move(chunk.transform),
-                                  TransformedArray(array)),
-          this->set_error(_));
+                                  TransformedArray(array)))
+          .With([this](absl::Status error) {
+            this->set_error(std::move(error));
+          });
     }
     void set_done() { promise_ = {}; }
     void set_error(absl::Status error) {

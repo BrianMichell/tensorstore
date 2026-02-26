@@ -44,6 +44,7 @@
 #include "tensorstore/util/future_impl.h"  // IWYU pragma: export
 #include "tensorstore/util/result.h"
 #include "tensorstore/util/span.h"
+#include "tensorstore/util/status_builder.h"
 
 TENSORSTORE_LLDB_AUTO_SCRIPT("future.py")
 
@@ -755,6 +756,13 @@ class Future : public AnyFuture {
       : Future(MakeReadyFuture<std::remove_const_t<T>>(status)) {}
   Future(absl::Status&& status)
       : Future(MakeReadyFuture<std::remove_const_t<T>>(std::move(status))) {}
+
+  Future(const StatusBuilder& builder)
+      : Future(MakeReadyFuture<std::remove_const_t<T>>(builder.BuildStatus())) {
+  }
+  Future(StatusBuilder&& builder)
+      : Future(MakeReadyFuture<std::remove_const_t<T>>(
+            std::move(builder).BuildStatus())) {}
 
   /// Construct a Future<T> from a Result<U>.
   ///

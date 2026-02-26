@@ -3081,8 +3081,8 @@ def repo_pypa_sphinx_immaterial():
         name = "pypa_sphinx_immaterial",
         target = "sphinx_immaterial",
         requirement = [
-            "sphinx-immaterial==0.13.8",
-            "--hash=sha256:fd92cc9e9f65e1f3a28a9f4f6886250a97dc65da41ece67f562bc1c00e89be6f",
+            "sphinx-immaterial==0.13.9",
+            "--hash=sha256:5ea92d2ddc6befcd0fedbd3e6766ea4746e94d9a8a5cc0ab092a946e1fde4254",
         ],
         deps = [
             "@pypa_typing_extensions//:typing_extensions",

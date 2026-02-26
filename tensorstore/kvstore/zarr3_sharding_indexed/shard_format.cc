@@ -124,7 +124,7 @@ Result<ShardIndex> DecodeShardIndexFromFullShard(
   TENSORSTORE_ASSIGN_OR_RETURN(
       auto shard_index,
       DecodeShardIndex(encoded_shard_index, shard_index_parameters),
-      tensorstore::MaybeAnnotateStatus(_, "Error decoding shard index"));
+      _.Format("Error decoding shard index"));
   return shard_index;
 }
 

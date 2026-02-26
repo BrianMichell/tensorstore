@@ -576,10 +576,8 @@ absl::Status SetChunkShape(ChunkLayout& self,
                            MaybeHardConstraintSpan<Index> value, Usage usage,
                            StoragePtr& storage_to_be_destroyed) {
   TENSORSTORE_RETURN_IF_ERROR(
-      SetChunkShapeInternal(self, value, usage, storage_to_be_destroyed),
-      tensorstore::MaybeAnnotateStatus(
-          _, absl::StrFormat("Error setting %s_chunk shape",
-                             absl::FormatStreamed(usage))));
+      SetChunkShapeInternal(self, value, usage, storage_to_be_destroyed))
+      .Format("Error setting %v_chunk shape", usage);
   return absl::OkStatus();
 }
 
@@ -601,10 +599,8 @@ absl::Status SetChunkAspectRatio(ChunkLayout& self,
                                  Usage usage,
                                  StoragePtr& storage_to_be_destroyed) {
   TENSORSTORE_RETURN_IF_ERROR(
-      SetChunkAspectRatioInternal(self, value, usage, storage_to_be_destroyed),
-      tensorstore::MaybeAnnotateStatus(
-          _, absl::StrFormat("Error setting %s_chunk aspect_ratio",
-                             absl::FormatStreamed(usage))));
+      SetChunkAspectRatioInternal(self, value, usage, storage_to_be_destroyed))
+      .Format("Error setting %v_chunk aspect_ratio", usage);
   return absl::OkStatus();
 }
 
@@ -649,9 +645,8 @@ absl::Status SetChunkElements(ChunkLayout& self,
                               ChunkLayout::ChunkElementsBase value, Usage usage,
                               StoragePtr& storage_to_be_destroyed) {
   TENSORSTORE_RETURN_IF_ERROR(
-      SetChunkElementsInternal(self, value, usage, storage_to_be_destroyed),
-      tensorstore::MaybeAnnotateStatus(
-          _, absl::StrFormat("Error setting %v_chunk elements", usage)));
+      SetChunkElementsInternal(self, value, usage, storage_to_be_destroyed))
+      .Format("Error setting %v_chunk elements", usage);
   return absl::OkStatus();
 }
 
@@ -745,8 +740,8 @@ absl::Status ChunkLayout::Set(InnerOrder value) {
   if (!value.valid()) return absl::OkStatus();
   StoragePtr storage_to_be_destroyed;
   TENSORSTORE_RETURN_IF_ERROR(
-      SetInnerOrderInternal(*this, value, storage_to_be_destroyed),
-      tensorstore::MaybeAnnotateStatus(_, "Error setting inner_order"));
+      SetInnerOrderInternal(*this, value, storage_to_be_destroyed))
+      .Format("Error setting inner_order");
   return absl::OkStatus();
 }
 
@@ -766,8 +761,8 @@ absl::Status ChunkLayout::Set(GridOrigin value) {
   if (!value.valid()) return absl::OkStatus();
   StoragePtr storage_to_be_destroyed;
   TENSORSTORE_RETURN_IF_ERROR(
-      SetGridOriginInternal(*this, value, storage_to_be_destroyed),
-      tensorstore::MaybeAnnotateStatus(_, "Error setting grid_origin"));
+      SetGridOriginInternal(*this, value, storage_to_be_destroyed))
+      .Format("Error setting grid_origin");
   return absl::OkStatus();
 }
 
@@ -917,7 +912,8 @@ template <typename Wrapper, typename Traits, typename Getter, typename Setter>
 constexpr auto VectorJsonBinder(Getter getter, Setter setter) {
   using ElementType = typename Wrapper::value_type;
   return [=](bool hard_constraint) {
-    return [=](auto is_loading, const auto& options, auto* obj, auto* j) {
+    return [=](auto is_loading, const auto& options, auto* obj,
+               auto* j) -> absl::Status {
       constexpr auto element_binder = jb::MapValue(
           jb::DefaultBinder<>, std::pair(Traits::kDefaultValue, nullptr));
       if constexpr (is_loading) {
@@ -954,7 +950,8 @@ constexpr auto VectorJsonBinder(Getter getter, Setter setter) {
 }
 
 constexpr auto InnerOrderJsonBinder(bool hard_constraint) {
-  return [=](auto is_loading, const auto& options, auto* obj, auto* j) {
+  return [=](auto is_loading, const auto& options, auto* obj,
+             auto* j) -> absl::Status {
     if constexpr (is_loading) {
       if (j->is_discarded() || j->is_null()) {
         return absl::OkStatus();
@@ -1024,7 +1021,8 @@ constexpr auto GridConstraintsJsonBinder(Usage usage) {
           "shape", "shape_soft_constraint",
           VectorJsonBinder<ChunkLayout::ChunkShapeBase, ShapeValueTraits>(
               [=](auto& self) { return GetChunkShape(self, usage); },
-              [=](auto& self, ChunkLayout::ChunkShapeBase value) {
+              [=](auto& self,
+                  ChunkLayout::ChunkShapeBase value) -> absl::Status {
                 StoragePtr storage_to_be_destroyed;
                 if (usage != ChunkLayout::kUnspecifiedUsage) {
                   return SetChunkShapeInternal(self, value, usage,
@@ -1041,7 +1039,8 @@ constexpr auto GridConstraintsJsonBinder(Usage usage) {
           VectorJsonBinder<ChunkLayout::ChunkAspectRatioBase,
                            AspectRatioValueTraits>(
               [=](auto& self) { return GetChunkAspectRatio(self, usage); },
-              [=](auto& self, ChunkLayout::ChunkAspectRatioBase value) {
+              [=](auto& self,
+                  ChunkLayout::ChunkAspectRatioBase value) -> absl::Status {
                 StoragePtr storage_to_be_destroyed;
                 if (usage != ChunkLayout::kUnspecifiedUsage) {
                   return SetChunkAspectRatioInternal(self, value, usage,
@@ -1064,7 +1063,7 @@ constexpr auto GridConstraintsJsonBinder(Usage usage) {
                     return kImplicit;
                   return value.value;
                 },
-                [=](auto& self, Index value) {
+                [=](auto& self, Index value) -> absl::Status {
                   ChunkLayout::ChunkElementsBase elements(value,
                                                           hard_constraint);
                   StoragePtr storage_to_be_destroyed;
@@ -1198,11 +1197,8 @@ static absl::Status TransformInputVector(
     if (value == Traits::kDefaultValue) continue;
     TENSORSTORE_ASSIGN_OR_RETURN(
         value, Traits::TransformInputValue(value, map.offset(), map.stride()),
-        MaybeAnnotateStatus(
-            _,
-            absl::StrFormat(
-                "Error transforming input dimension %d -> output dimension %d",
-                input_dim, output_dim)));
+        _.Format("Error transforming input dimension %d -> output dimension %d",
+                 input_dim, output_dim));
     out_vec[output_dim] = value;
     // The output constraint is a hard constraint if, and only if, the input
     // constraint is a hard constraint.
@@ -1278,11 +1274,8 @@ static absl::Status TransformOutputVector(
     if (value == Traits::kDefaultValue) continue;
     TENSORSTORE_ASSIGN_OR_RETURN(
         value, Traits::TransformOutputValue(value, map.offset(), map.stride()),
-        MaybeAnnotateStatus(
-            _,
-            absl::StrFormat(
-                "Error transforming output dimension %d -> input dimension %d",
-                output_dim, input_dim)));
+        _.Format("Error transforming output dimension %d -> input dimension %d",
+                 output_dim, input_dim));
     in_vec[input_dim] = value;
     // The input constraint is a hard constraint if, and only if, the output
     // constraint is a hard constraint.
@@ -1306,16 +1299,16 @@ absl::Status TransformOutputGridConstraints(Storage& output_storage,
           output_storage.chunk_shape(usage_index),
           output_storage.chunk_shape_hard_constraint_[usage_index],
           input_storage.chunk_shape(usage_index),
-          input_storage.chunk_shape_hard_constraint_[usage_index]),
-      tensorstore::MaybeAnnotateStatus(_, "Error transforming shape"));
+          input_storage.chunk_shape_hard_constraint_[usage_index]))
+      .Format("Error transforming shape");
   TENSORSTORE_RETURN_IF_ERROR(
       TransformOutputVector<AspectRatioValueTraits>(
           transform, one_to_one_input_dims,
           output_storage.chunk_aspect_ratio(usage_index),
           output_storage.chunk_aspect_ratio_hard_constraint_[usage_index],
           input_storage.chunk_aspect_ratio(usage_index),
-          input_storage.chunk_aspect_ratio_hard_constraint_[usage_index]),
-      tensorstore::MaybeAnnotateStatus(_, "Error transforming aspect_ratio"));
+          input_storage.chunk_aspect_ratio_hard_constraint_[usage_index]))
+      .Format("Error transforming aspect_ratio");
   return absl::OkStatus();
 }
 
@@ -1330,15 +1323,15 @@ absl::Status TransformInputGridConstraints(Storage& input_storage,
           transform, input_storage.chunk_shape(usage_index),
           input_storage.chunk_shape_hard_constraint_[usage_index],
           output_storage.chunk_shape(usage_index),
-          output_storage.chunk_shape_hard_constraint_[usage_index]),
-      tensorstore::MaybeAnnotateStatus(_, "Error transforming shape"));
+          output_storage.chunk_shape_hard_constraint_[usage_index]))
+      .Format("Error transforming shape");
   TENSORSTORE_RETURN_IF_ERROR(
       TransformInputVector<AspectRatioValueTraits>(
           transform, input_storage.chunk_aspect_ratio(usage_index),
           input_storage.chunk_aspect_ratio_hard_constraint_[usage_index],
           output_storage.chunk_aspect_ratio(usage_index),
-          output_storage.chunk_aspect_ratio_hard_constraint_[usage_index]),
-      tensorstore::MaybeAnnotateStatus(_, "Error transforming aspect_ratio"));
+          output_storage.chunk_aspect_ratio_hard_constraint_[usage_index]))
+      .Format("Error transforming aspect_ratio");
   return absl::OkStatus();
 }
 
@@ -1389,17 +1382,14 @@ Result<ChunkLayout> ApplyIndexTransform(IndexTransformView<> transform,
           output_storage->grid_origin_hard_constraint_,
           tensorstore::span<Index>(input_constraints.storage_->grid_origin(),
                                    input_rank),
-          input_constraints.storage_->grid_origin_hard_constraint_),
-      tensorstore::MaybeAnnotateStatus(_, "Error transforming grid_origin"));
+          input_constraints.storage_->grid_origin_hard_constraint_))
+      .Format("Error transforming grid_origin");
   for (size_t usage_index = 0; usage_index < kNumUsages; ++usage_index) {
     TENSORSTORE_RETURN_IF_ERROR(
         TransformOutputGridConstraints(
             *output_storage, *input_constraints.storage_, one_to_one_input_dims,
-            transform, usage_index),
-        tensorstore::MaybeAnnotateStatus(
-            _, absl::StrFormat(
-                   "Error transforming %s_chunk",
-                   absl::FormatStreamed(static_cast<Usage>(usage_index)))));
+            transform, usage_index))
+        .Format("Error transforming %v_chunk", static_cast<Usage>(usage_index));
   }
   return input_constraints;
 }
@@ -1447,17 +1437,14 @@ Result<ChunkLayout> ApplyInverseIndexTransform(IndexTransformView<> transform,
           input_storage->grid_origin_hard_constraint_,
           tensorstore::span<Index>(output_constraints.storage_->grid_origin(),
                                    output_rank),
-          output_constraints.storage_->grid_origin_hard_constraint_),
-      tensorstore::MaybeAnnotateStatus(_, "Error transforming grid_origin"));
+          output_constraints.storage_->grid_origin_hard_constraint_))
+      .Format("Error transforming grid_origin");
   for (size_t usage_index = 0; usage_index < kNumUsages; ++usage_index) {
     TENSORSTORE_RETURN_IF_ERROR(
         TransformInputGridConstraints(*input_storage,
                                       *output_constraints.storage_, transform,
-                                      usage_index),
-        tensorstore::MaybeAnnotateStatus(
-            _, absl::StrFormat(
-                   "Error transforming %s_chunk",
-                   absl::FormatStreamed(static_cast<Usage>(usage_index)))));
+                                      usage_index))
+        .Format("Error transforming %v_chunk", static_cast<Usage>(usage_index));
   }
   return output_constraints;
 }
@@ -1658,9 +1645,7 @@ absl::Status ChooseChunkGridOrigin(
     }
     TENSORSTORE_ASSIGN_OR_RETURN(
         auto interval, IndexInterval::Sized(origin_value, chunk_shape[i]),
-        tensorstore::MaybeAnnotateStatus(
-            _,
-            absl::StrFormat("Invalid chunk constraints for dimension %d", i)));
+        _.Format("Invalid chunk constraints for dimension %d", i));
     grid_origin[i] = interval.inclusive_min();
   }
   return absl::OkStatus();
@@ -1777,12 +1762,11 @@ absl::Status ChooseReadWriteChunkGrid(const ChunkLayout& constraints,
                                       BoxView<> domain,
                                       MutableBoxView<> chunk_template) {
   ChunkLayout combined_constraints = constraints;
-  TENSORSTORE_RETURN_IF_ERROR(
-      combined_constraints.Set(
-          ChunkLayout::ReadChunk(constraints.write_chunk())),
-      tensorstore::MaybeAnnotateStatus(_,
-                                       "write_chunk constraints not compatible "
-                                       "with existing read_chunk constraints"));
+  TENSORSTORE_RETURN_IF_ERROR(combined_constraints.Set(ChunkLayout::ReadChunk(
+                                  constraints.write_chunk())))
+      .Format(
+          "write_chunk constraints not compatible "
+          "with existing read_chunk constraints");
   return ChooseChunkGrid(combined_constraints.grid_origin(),
                          combined_constraints.read_chunk(), domain,
                          chunk_template);
@@ -1963,11 +1947,7 @@ absl::Status ChunkLayout::Finalize() {
       std::fill_n(impl.chunk_aspect_ratio(usage_index).begin(), rank, 0);
       return absl::OkStatus();
     }();
-    if (!status.ok()) {
-      return tensorstore::MaybeAnnotateStatus(
-          status, absl::StrFormat("Invalid %s chunk grid",
-                                  absl::FormatStreamed(usage)));
-    }
+    TENSORSTORE_RETURN_IF_ERROR(status).Format("Invalid %v chunk grid", usage);
   }
 
   auto write_chunk_shape = impl.chunk_shape(static_cast<size_t>(Usage::kWrite));
@@ -2151,10 +2131,7 @@ absl::Status ChunkLayout::GetChunkTemplate(Usage usage,
     }
     TENSORSTORE_ASSIGN_OR_RETURN(
         box[i], IndexInterval::Sized(grid_origin[i], shape[i]),
-        tensorstore::MaybeAnnotateStatus(
-            _,
-            absl::StrFormat(
-                "Incompatible grid origin/chunk shape for dimension %d", i)));
+        _.Format("Incompatible grid origin/chunk shape for dimension %d", i));
   }
   return absl::OkStatus();
 }

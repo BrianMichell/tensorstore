@@ -481,9 +481,8 @@ Result<Index> OutputIndexMap::operator()(
           data.element_pointer.byte_strided_pointer()[IndexInnerProduct(
               input_indices.size(), input_indices.data(), data.byte_strides)];
       TENSORSTORE_RETURN_IF_ERROR(
-          CheckContains(data.index_range, base_output_index),
-          MaybeAnnotateStatus(
-              _, "Checking result of index array output index map"));
+          CheckContains(data.index_range, base_output_index))
+          .Format("Checking result of index array output index map");
       break;
     }
   }
@@ -511,9 +510,7 @@ absl::Status TransformIndices(TransformRep* data,
     TENSORSTORE_ASSIGN_OR_RETURN(
         output_indices[output_dim],
         output_index_maps[output_dim](input_indices),
-        MaybeAnnotateStatus(
-            _, absl::StrFormat("Computing index for output dimension %d",
-                               output_dim)));
+        _.Format("Computing index for output dimension %d", output_dim));
   }
   return absl::OkStatus();
 }
@@ -526,8 +523,8 @@ absl::Status ReplaceZeroRankIndexArrayIndexMap(Index index,
   Index new_offset;
   if (internal::MulOverflow(index, *output_stride, &new_offset) ||
       internal::AddOverflow(new_offset, *output_offset, output_offset)) {
-    return absl::InvalidArgumentError(tensorstore::StrCat(
-        "Integer overflow computing offset for output dimension."));
+    return absl::InvalidArgumentError(
+        "Integer overflow computing offset for output dimension.");
   }
   *output_stride = 0;
   return absl::OkStatus();

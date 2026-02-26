@@ -40,6 +40,7 @@
 #include "tensorstore/util/result.h"
 #include "tensorstore/util/span.h"
 #include "tensorstore/util/status.h"
+#include "tensorstore/util/status_builder.h"
 #include "tensorstore/util/str_cat.h"
 
 namespace tensorstore {
@@ -70,7 +71,7 @@ void KvsBackedChunkCache::Entry::DoDecode(std::optional<absl::Cord> value,
         cache.DecodeChunk(this->cell_indices(), *std::move(value));
     if (!decoded_result.ok()) {
       auto status = internal::ConvertInvalidArgumentToFailedPrecondition(
-          std::move(decoded_result).status());
+          StatusBuilder(std::move(decoded_result).status()));
       execution::set_error(
           receiver, std::move(trace_span).EndWithStatus(std::move(status)));
       return;

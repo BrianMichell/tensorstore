@@ -28,6 +28,7 @@
 #include "absl/base/optimization.h"
 #include "absl/status/status.h"
 #include "absl/strings/cord.h"
+#include "absl/strings/str_cat.h"
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
 #include <nlohmann/json_fwd.hpp>
@@ -71,6 +72,7 @@
 #include "tensorstore/tensorstore.h"
 #include "tensorstore/transaction.h"
 #include "tensorstore/util/dimension_set.h"
+#include "tensorstore/util/quote_string.h"
 #include "tensorstore/util/result.h"
 #include "tensorstore/util/span.h"
 #include "tensorstore/util/status_testutil.h"
@@ -89,7 +91,6 @@ using ::tensorstore::kImplicit;
 using ::tensorstore::MatchesJson;
 using ::tensorstore::Schema;
 using ::tensorstore::StatusIs;
-using ::tensorstore::StrCat;
 using ::tensorstore::dtypes::complex64_t;
 using ::tensorstore::internal::DecodedMatches;
 using ::tensorstore::internal::GetMap;
@@ -1812,9 +1813,10 @@ TEST(ZarrDriverTest, InvalidSpecMemberType) {
                                   tensorstore::ReadWriteMode::read_write)
                     .result(),
                 StatusIs(absl::StatusCode::kInvalidArgument,
-                         MatchesRegex(tensorstore::StrCat(
-                             "Error parsing object member \"", member_name,
-                             "\": Expected .*, but received: 5"))));
+                         MatchesRegex(
+                             absl::StrCat("Error parsing object member ",
+                                          tensorstore::QuoteString(member_name),
+                                          ": Expected .*, but received: 5"))));
   }
 }
 

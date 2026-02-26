@@ -36,7 +36,7 @@ follows:
 
 Depends on the following command-line tools:
   uv
-  uildifier
+  buildifier
 """
 
 import argparse
@@ -58,6 +58,8 @@ _RESOLVED_REQUIREMENT_PATTERN = re.compile(
     re.VERBOSE,
 )
 
+_UV = ["uv"]
+
 
 def resolve_requirements(
     requirements_files: list[str],
@@ -66,7 +68,8 @@ def resolve_requirements(
 ):
   """Returns the resolved requirements as text."""
   return subprocess.run(
-      ["uv", "pip", "compile"]
+      _UV
+      + ["pip", "compile"]
       + requirements_files
       + [
           "--generate-hashes",

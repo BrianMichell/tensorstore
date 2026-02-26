@@ -14,12 +14,14 @@
 
 #include "tensorstore/kvstore/ocdbt/format/manifest.h"
 
+#include <stddef.h>
 #include <stdint.h>
 
 #include <cassert>
 #include <ostream>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "absl/functional/function_ref.h"
@@ -155,8 +157,11 @@ bool ReadManifestVersionTreeNodes(
   }
   TENSORSTORE_RETURN_IF_ERROR(
       ValidateManifestVersionTreeNodes(
-          version_tree_arity_log2, last_generation_number, version_tree_nodes),
-      reader.Fail(_), false);
+          version_tree_arity_log2, last_generation_number, version_tree_nodes))
+      .With([&](absl::Status status) {
+        reader.Fail(std::move(status));
+        return false;
+      });
   return true;
 }
 
@@ -227,9 +232,7 @@ Result<Manifest> DecodeManifest(const absl::Cord& encoded) {
         }
         return true;
       });
-  if (!status.ok()) {
-    return tensorstore::MaybeAnnotateStatus(status, "Error decoding manifest");
-  }
+  TENSORSTORE_RETURN_IF_ERROR(status).Format("Error decoding manifest");
 #ifndef NDEBUG
   CheckManifestInvariants(manifest);
 #endif

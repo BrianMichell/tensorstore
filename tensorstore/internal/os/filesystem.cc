@@ -28,6 +28,7 @@
 #include "tensorstore/internal/os/file_lister.h"
 #include "tensorstore/internal/os/file_util.h"
 #include "tensorstore/util/status.h"
+#include "tensorstore/util/status_builder.h"
 
 namespace tensorstore {
 namespace internal_os {
@@ -66,10 +67,12 @@ absl::Status RemoveAll(const std::string& root_directory) {
       [&](auto entry) {
         auto status = entry.Delete();
         if (!status.ok() && !absl::IsNotFound(status)) {
-          ABSL_LOG(INFO) << "Failed to remove " << entry.GetFullPath() << ": "
-                         << status;
-          MaybeAddSourceLocation(status);
-          result.Update(status);
+          result.Update(StatusBuilder(status)
+                            .Format("Failed to remove %s", entry.GetFullPath())
+                            .With([](absl::Status s) {
+                              ABSL_LOG(INFO) << s;
+                              return s;
+                            }));
         }
         return absl::OkStatus();
       });

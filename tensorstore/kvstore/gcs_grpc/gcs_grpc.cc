@@ -82,6 +82,7 @@
 #include "tensorstore/util/quote_string.h"
 #include "tensorstore/util/result.h"
 #include "tensorstore/util/status.h"
+#include "tensorstore/util/status_builder.h"
 #include "tensorstore/util/str_cat.h"
 
 // specializations
@@ -220,10 +221,9 @@ absl::Status GcsGrpcKeyValueStore::BackoffForAttemptAsync(
     SourceLocation loc) {
   auto delay = spec_.retries->BackoffForAttempt(attempt);
   if (!delay) {
-    return MaybeAnnotateStatus(std::move(status),
-                               absl::StrFormat("All %d retry attempts failed",
-                                               spec_.retries->max_retries),
-                               absl::StatusCode::kAborted, loc);
+    return StatusBuilder(std::move(status))
+        .SetCode(absl::StatusCode::kAborted)
+        .Format("All %d retry attempts failed", spec_.retries->max_retries);
   }
   gcs_grpc_metrics.retries.Increment();
   ScheduleAt(absl::Now() + *delay,

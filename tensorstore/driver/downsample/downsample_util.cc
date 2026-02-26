@@ -602,13 +602,9 @@ absl::Status PropagateIndexTransformDownsampling(
         break;
       }
     }
-    if (!status.ok()) {
-      return tensorstore::MaybeAnnotateStatus(
-          status,
-          tensorstore::StrCat("Propagating downsampling factor ",
-                              output_downsample_factor,
-                              " through output dimension ", output_dim));
-    }
+    TENSORSTORE_RETURN_IF_ERROR(status).Format(
+        "Propagating downsampling factor %d through output dimension %d",
+        output_downsample_factor, output_dim);
   }
   internal_index_space::DebugCheckInvariants(new_transform.get());
   propagated.transform =

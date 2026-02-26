@@ -177,7 +177,7 @@ TENSORSTORE_DEFINE_JSON_DEFAULT_BINDER(
                        jb::DefaultValue<jb::kNeverIncludeDefaults>([](auto* v) {
                          *v = false;
                        }))),
-        jb::Initialize([](auto* obj) {
+        jb::Initialize([](auto* obj) -> absl::Status {
           // Validate that field and open_as_void are mutually exclusive
           if (obj->open_as_void && !obj->selected_field.empty()) {
             return absl::InvalidArgumentError(
@@ -528,8 +528,7 @@ class ZarrDriver::OpenState : public ZarrDriver::OpenStateBase {
         internal_zarr::GetNewMetadata(spec().partial_metadata,
                                       spec().selected_field, spec().schema,
                                       spec().open_as_void),
-        tensorstore::MaybeAnnotateStatus(
-            _, "Cannot create using specified \"metadata\" and schema"));
+        _.Format("Cannot create using specified \"metadata\" and schema"));
     return metadata;
   }
 

@@ -37,6 +37,7 @@
 #include "tensorstore/util/quote_string.h"
 #include "tensorstore/util/result.h"
 #include "tensorstore/util/status.h"
+#include "tensorstore/util/status_builder.h"
 #include "tensorstore/util/str_cat.h"
 
 // specializations
@@ -137,8 +138,10 @@ const auto kPartialBinder = jb::TaggedVariantBinder<std::string, 6>(
 absl::Status AwsCredentialsSpec::PartialBinder::operator()(
     std::true_type is_loading, const internal_json_binding::NoOptions& options,
     Spec* value, ::nlohmann::json::object_t* j) const {
-  auto status = kPartialBinder(is_loading, options, &value->config, j);
-  return MaybeAnnotateStatus(status, "Failed to parse AWS credentials spec");
+  TENSORSTORE_RETURN_IF_ERROR(
+      kPartialBinder(is_loading, options, &value->config, j))
+      .Format("Failed to parse AWS credentials spec");
+  return absl::OkStatus();
 }
 
 absl::Status AwsCredentialsSpec::PartialBinder::operator()(

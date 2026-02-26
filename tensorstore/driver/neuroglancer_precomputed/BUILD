@@ -128,6 +128,7 @@ tensorstore_cc_test(
         "//tensorstore/util:str_cat",
         "//tensorstore/util:unit",
         "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/strings",
         "@abseil-cpp//absl/strings:cord",
         "@abseil-cpp//absl/time",
         "@googletest//:gtest_main",
@@ -177,6 +178,7 @@ tensorstore_cc_library(
         "@abseil-cpp//absl/numeric:bits",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/strings:str_format",
         "@nlohmann_json//:json",
     ],
 )
@@ -200,6 +202,7 @@ tensorstore_cc_test(
         "//tensorstore/util:status_testutil",
         "//tensorstore/util:str_cat",
         "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/strings",
         "@googletest//:gtest_main",
         "@nlohmann_json//:json",
     ],

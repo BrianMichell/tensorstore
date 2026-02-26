@@ -754,8 +754,8 @@ absl::Status ValidateMetadata(const ZarrMetadata& metadata,
   if (constraints.codec_specs) {
     ZarrCodecChainSpec codecs_copy = metadata.codec_specs;
     TENSORSTORE_RETURN_IF_ERROR(
-        codecs_copy.MergeFrom(*constraints.codec_specs, /*strict=*/true),
-        tensorstore::MaybeAnnotateStatus(_, "Mismatch in \"codecs\""));
+        codecs_copy.MergeFrom(*constraints.codec_specs, /*strict=*/true))
+        .Format("Mismatch in \"codecs\"");
   }
   if (constraints.dimension_names &&
       *constraints.dimension_names != metadata.dimension_names) {
@@ -765,8 +765,8 @@ absl::Status ValidateMetadata(const ZarrMetadata& metadata,
   }
   TENSORSTORE_RETURN_IF_ERROR(
       internal::ValidateMetadataSubset(constraints.user_attributes,
-                                       metadata.user_attributes),
-      tensorstore::MaybeAnnotateStatus(_, "Mismatch in \"attributes\""));
+                                       metadata.user_attributes))
+      .Format("Mismatch in \"attributes\"");
   if (constraints.dimension_units) {
     for (DimensionIndex i = 0, rank = metadata.rank; i < rank; ++i) {
       const auto& constraint_unit = (*constraints.dimension_units)[i];
@@ -900,9 +900,8 @@ Result<IndexDomain<>> GetEffectiveDomain(
   TENSORSTORE_ASSIGN_OR_RETURN(auto domain_from_metadata, builder.Finalize());
   TENSORSTORE_ASSIGN_OR_RETURN(
       domain, MergeIndexDomains(domain, domain_from_metadata),
-      internal::ConvertInvalidArgumentToFailedPrecondition(
-          tensorstore::MaybeAnnotateStatus(
-              _, "Mismatch between metadata and schema")));
+      _.Format("Mismatch between metadata and schema")
+          .With(internal::ConvertInvalidArgumentToFailedPrecondition));
   return WithImplicitDimensions(domain, false, true);
 }
 
@@ -1113,21 +1112,19 @@ absl::Status ValidateMetadataSchema(const ZarrMetadata& metadata,
 
   if (auto schema_codec = schema.codec(); schema_codec.valid()) {
     auto codec = GetCodecFromMetadata(metadata);
-    TENSORSTORE_RETURN_IF_ERROR(
-        codec.MergeFrom(schema_codec),
-        tensorstore::MaybeAnnotateStatus(
-            _, "codec from metadata does not match codec in schema"));
+    TENSORSTORE_RETURN_IF_ERROR(codec.MergeFrom(schema_codec))
+        .Format("codec from metadata does not match codec in schema");
   }
 
   if (auto schema_dimension_units = schema.dimension_units();
       schema_dimension_units.valid()) {
     TENSORSTORE_RETURN_IF_ERROR(
         GetEffectiveDimensionUnits(metadata.rank, metadata.dimension_units,
-                                   schema_dimension_units),
-        tensorstore::MaybeAnnotateStatus(
-            internal::ConvertInvalidArgumentToFailedPrecondition(_),
+                                   schema_dimension_units))
+        .Format(
             "dimension_units from metadata does not match dimension_units in "
-            "schema"));
+            "schema")
+        .With(internal::ConvertInvalidArgumentToFailedPrecondition);
   }
 
   return absl::OkStatus();
@@ -1239,8 +1236,7 @@ Result<std::shared_ptr<const ZarrMetadata>> GetNewMetadata(
       metadata->fill_value.push_back(std::move(converted_fill_value));
       return absl::OkStatus();
     }();
-    TENSORSTORE_RETURN_IF_ERROR(
-        status, tensorstore::MaybeAnnotateStatus(_, "Invalid fill_value"));
+    TENSORSTORE_RETURN_IF_ERROR(status).Format("Invalid fill_value");
   } else {
     metadata->fill_value.resize(metadata->data_type.fields.size());
     for (size_t i = 0; i < metadata->fill_value.size(); ++i) {
@@ -1258,7 +1254,7 @@ Result<std::shared_ptr<const ZarrMetadata>> GetNewMetadata(
       auto dimension_units,
       GetEffectiveDimensionUnits(rank, metadata_constraints.dimension_units,
                                  schema.dimension_units()),
-      tensorstore::MaybeAnnotateStatus(_, "Invalid dimension_units"));
+      _.Format("Invalid dimension_units"));
   if (std::any_of(dimension_units.begin(), dimension_units.end(),
                   [](const auto& unit) { return unit.has_value(); })) {
     metadata->dimension_units = std::move(dimension_units);

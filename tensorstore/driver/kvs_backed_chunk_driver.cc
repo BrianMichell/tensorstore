@@ -84,6 +84,7 @@
 #include "tensorstore/util/result.h"
 #include "tensorstore/util/span.h"
 #include "tensorstore/util/status.h"
+#include "tensorstore/util/status_builder.h"
 #include "tensorstore/util/str_cat.h"
 
 #ifndef TENSORSTORE_KVS_DRIVER_DEBUG
@@ -1182,8 +1183,9 @@ void MetadataCache::Entry::DoDecode(std::optional<absl::Cord> value,
         new_metadata = *std::move(result);
       } else {
         execution::set_error(
-            receiver, internal::ConvertInvalidArgumentToFailedPrecondition(
-                          std::move(result).status()));
+            receiver,
+            StatusBuilder(std::move(result).status())
+                .With(internal::ConvertInvalidArgumentToFailedPrecondition));
         return;
       }
     }

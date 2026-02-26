@@ -121,8 +121,7 @@ absl::Status PngReader::Context::Initialize() {
   }();
 
   if (!reader_->ok() || !last_error_.ok()) {
-    return internal::StatusBuilder(!reader_->ok() ? reader_->status()
-                                                  : last_error_)
+    return StatusBuilder(!reader_->ok() ? reader_->status() : last_error_)
         .SetCode(absl::StatusCode::kInvalidArgument);
   }
 
@@ -217,8 +216,7 @@ absl::Status PngReader::Context::Decode(tensorstore::span<unsigned char> dest) {
   }();
 
   if (!ok || !reader_->ok() || !last_error_.ok()) {
-    return internal::StatusBuilder(!reader_->ok() ? reader_->status()
-                                                  : last_error_)
+    return StatusBuilder(!reader_->ok() ? reader_->status() : last_error_)
         .SetCode(absl::StatusCode::kDataLoss)
         .Format("Failed to decode PNG");
   }

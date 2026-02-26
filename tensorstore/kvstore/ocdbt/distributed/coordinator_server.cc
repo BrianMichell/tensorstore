@@ -149,10 +149,12 @@ grpc::ServerUnaryReactor* CoordinatorServer::Impl::RequestLease(
   TENSORSTORE_ASSIGN_OR_RETURN(
       auto lease_duration,
       internal::ProtoToAbslDuration(request->lease_duration()),
-      (reactor->Finish(grpc::Status(
-           grpc::StatusCode::INVALID_ARGUMENT,
-           tensorstore::StrCat("Invalid lease duration: ", _.message()))),
-       reactor));
+      _.With([&](absl::Status status) {
+        reactor->Finish(grpc::Status(
+            grpc::StatusCode::INVALID_ARGUMENT,
+            tensorstore::StrCat("Invalid lease duration: ", status.message())));
+        return reactor;
+      }));
 
   // Lookup lease.
   {

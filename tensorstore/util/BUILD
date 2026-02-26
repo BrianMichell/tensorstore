@@ -355,6 +355,7 @@ tensorstore_cc_library(
         ":executor",
         ":result",
         ":span",
+        ":status",
         "//tensorstore/internal:intrusive_ptr",
         "//tensorstore/internal:lldb_scripting",
         "//tensorstore/internal:tagged_ptr",
@@ -619,9 +620,6 @@ tensorstore_cc_test(
     srcs = ["span_test.cc"],
     deps = [
         ":span",
-        ":str_cat",
-        "@abseil-cpp//absl/base:core_headers",
-        "@abseil-cpp//absl/types:span",
         "@googletest//:gtest_main",
     ],
 )
@@ -640,7 +638,6 @@ tensorstore_cc_library(
     ],
     deps = [
         "//tensorstore/internal:source_location",
-        "//tensorstore/internal/preprocessor:expand",
         "@abseil-cpp//absl/base:core_headers",
         "@abseil-cpp//absl/meta:type_traits",
         "@abseil-cpp//absl/status",
@@ -689,6 +686,7 @@ tensorstore_cc_library(
     deps = [
         ":future",
         ":result",
+        ":status",
         "@abseil-cpp//absl/status",
         "@googletest//:gtest",
     ],

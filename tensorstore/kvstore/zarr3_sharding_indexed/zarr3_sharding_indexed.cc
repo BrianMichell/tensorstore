@@ -79,6 +79,7 @@
 #include "tensorstore/util/result.h"
 #include "tensorstore/util/span.h"
 #include "tensorstore/util/status.h"
+#include "tensorstore/util/status_builder.h"
 #include "tensorstore/util/str_cat.h"
 
 // specializations
@@ -128,7 +129,8 @@ class ShardIndexKeyValueStore : public kvstore::Driver {
     return MapFutureError(
         InlineExecutor{},
         [](const absl::Status& status) {
-          return internal::ConvertInvalidArgumentToFailedPrecondition(status);
+          return StatusBuilder(status).With(
+              internal::ConvertInvalidArgumentToFailedPrecondition);
         },
         base_->Read(std::move(key), std::move(options)));
   }
@@ -1201,8 +1203,11 @@ class ReadOperationState
         return;
       }
       TENSORSTORE_RETURN_IF_ERROR(
-          index_entry.Validate(request.entry_id, read_result.value.size()),
-          static_cast<void>(request.promise.SetResult(_)));
+          index_entry.Validate(request.entry_id, read_result.value.size()))
+          .With([&](absl::Status error) {
+            request.promise.SetResult(std::move(error));
+          });
+
       TENSORSTORE_ASSIGN_OR_RETURN(
           auto validated_byte_range,
           request.byte_range.Validate(index_entry.length),
@@ -1264,12 +1269,13 @@ class ReadOperationState
         return;
       }
 
-      TENSORSTORE_RETURN_IF_ERROR(
-          index_entry.Validate(request.entry_id),
-          static_cast<void>(request.promise.SetResult(
-              self->shard_index_cache_entry_->AnnotateError(
-                  _,
-                  /*reading=*/true))));
+      TENSORSTORE_RETURN_IF_ERROR(index_entry.Validate(request.entry_id))
+          .With([&](absl::Status error) {
+            request.promise.SetResult(
+                self->shard_index_cache_entry_->AnnotateError(
+                    error,
+                    /*reading=*/true));
+          });
 
       assert(request.byte_range.SatisfiesInvariants());
 

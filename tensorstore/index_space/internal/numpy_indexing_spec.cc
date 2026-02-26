@@ -501,10 +501,8 @@ Result<IndexTransform<>> ToIndexTransform(
           ComputeStridedSliceMap(d.optionally_implicit_interval(),
                                  IntervalForm::half_open,
                                  /*translate_origin_to=*/kImplicit, s->start,
-                                 s->stop, s->step, &new_domain, &offset),
-          tensorstore::MaybeAnnotateStatus(
-              _, absl::StrFormat("Computing interval slice for dimension %d",
-                                 output_dim)));
+                                 s->stop, s->step, &new_domain, &offset))
+          .Format("Computing interval slice for dimension %d", output_dim);
       implicit_lower_bounds[input_dim] = new_domain.implicit_lower();
       implicit_upper_bounds[input_dim] = new_domain.implicit_upper();
       input_origin[input_dim] = new_domain.inclusive_min();

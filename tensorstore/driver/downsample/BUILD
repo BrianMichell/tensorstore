@@ -69,6 +69,7 @@ tensorstore_cc_library(
         "//tensorstore/util:status",
         "//tensorstore/util:str_cat",
         "//tensorstore/util/execution",
+        "//tensorstore/util/execution:any_receiver",
         "//tensorstore/util/execution:sender_util",
         "//tensorstore/util/garbage_collection",
         "@abseil-cpp//absl/base:core_headers",

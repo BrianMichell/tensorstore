@@ -29,6 +29,7 @@
 #include "tensorstore/util/quote_string.h"
 #include "tensorstore/util/result.h"
 #include "tensorstore/util/status.h"
+#include "tensorstore/util/status_builder.h"
 #include "tensorstore/util/str_cat.h"
 
 namespace tensorstore {
@@ -203,22 +204,19 @@ absl::Status HttpResponseCodeToStatus(const HttpResponse& response,
   if (code == absl::StatusCode::kOk) {
     return absl::OkStatus();
   }
-
+  StatusBuilder builder(code, loc);
   auto status_message = HttpResponseCodeToMessage(response);
-  if (!status_message) status_message = "Unknown";
-
-  absl::Status status(code, status_message);
+  if (status_message) {
+    status_message = "Unknown";
+  }
+  builder.Format("%s [HTTP code %d]", status_message, response.status_code);
   if (!response.payload.empty()) {
-    status.SetPayload(
+    builder.SetPayload(
         "http_response_body",
         response.payload.Subcord(
             0, response.payload.size() < 256 ? response.payload.size() : 256));
   }
-
-  MaybeAddSourceLocation(status, loc);
-  status.SetPayload("http_response_code",
-                    absl::Cord(tensorstore::StrCat(response.status_code)));
-  return status;
+  return builder;
 }
 
 Result<ParsedContentRange> ParseContentRangeHeader(

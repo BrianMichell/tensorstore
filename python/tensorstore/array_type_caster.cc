@@ -257,9 +257,10 @@ void AssignArrayLayout(pybind11::array array_obj, DimensionIndex rank,
 pybind11::object GetNumpyArrayImpl(SharedArrayView<const void> value,
                                    bool is_const) {
   if (value.rank() > NPY_MAXDIMS) {
-    throw std::out_of_range(tensorstore::StrCat(
-        "Array of rank ", value.rank(), " (which is greater than ", NPY_MAXDIMS,
-        ") cannot be converted to NumPy array"));
+    throw std::out_of_range(
+        absl::StrFormat("Array of rank %d (which is greater than %d) cannot be "
+                        "converted to NumPy array",
+                        value.rank(), NPY_MAXDIMS));
   }
   if (const DataTypeId id = value.dtype().id();
       id != DataTypeId::custom &&
@@ -378,8 +379,8 @@ bool ConvertToArrayImpl(pybind11::handle src,
     if (max_rank == 0 && obj.ndim() != 0) {
       if (data_type_constraint != dtype_v<::tensorstore::dtypes::json_t>) {
         if (no_throw) return false;
-        throw pybind11::value_error(tensorstore::StrCat(
-            "Expected array of rank 0, but received array of rank ",
+        throw pybind11::value_error(absl::StrFormat(
+            "Expected array of rank 0, but received array of rank %d",
             obj.ndim()));
       }
       // For json data type, the user may have specified a Python value like

@@ -959,8 +959,7 @@ class ZarrDriver::OpenState : public ZarrDriver::OpenStateBase {
         auto metadata,
         internal_zarr3::GetNewMetadata(spec().metadata_constraints,
                                        spec().schema, spec().selected_field, spec().open_as_void),
-        tensorstore::MaybeAnnotateStatus(
-            _, "Cannot create using specified \"metadata\" and schema"));
+        _.Format("Cannot create using specified \"metadata\" and schema"));
     return metadata;
   }
 

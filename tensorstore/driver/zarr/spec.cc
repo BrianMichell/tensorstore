@@ -26,6 +26,7 @@
 #include <vector>
 
 #include "absl/status/status.h"
+#include "absl/strings/str_format.h"
 #include <nlohmann/json_fwd.hpp>
 #include "tensorstore/array.h"
 #include "tensorstore/box.h"
@@ -226,7 +227,7 @@ Result<ZarrMetadataPtr> GetNewMetadata(
   // Determine domain.
   TENSORSTORE_ASSIGN_OR_RETURN(
       auto domain, GetDomainFromMetadata(info, partial_metadata.shape, schema),
-      tensorstore::MaybeAnnotateStatus(_, "Invalid domain"));
+      _.Format("Invalid domain"));
   if (!domain.valid() || !IsFinite(domain.box())) {
     return absl::InvalidArgumentError("domain must be specified");
   }
@@ -289,12 +290,12 @@ Result<ZarrMetadataPtr> GetNewMetadata(
   if (partial_metadata.fill_value) {
     metadata->fill_value = *partial_metadata.fill_value;
   } else if (auto fill_value = schema.fill_value(); fill_value.valid()) {
-    const auto status = [&] {
+    const auto status = [&]() -> absl::Status {
       if (metadata->dtype.fields.size() > 1) {
         return absl::InvalidArgumentError(
-            tensorstore::StrCat("Cannot specify fill_value through schema "
-                                "for structured zarr data type ",
-                                ::nlohmann::json(metadata->dtype).dump()));
+            absl::StrFormat("Cannot specify fill_value through schema "
+                            "for structured zarr data type %s",
+                            ::nlohmann::json(metadata->dtype).dump()));
       }
       TENSORSTORE_ASSIGN_OR_RETURN(
           auto broadcast_fill_value,
@@ -306,8 +307,7 @@ Result<ZarrMetadataPtr> GetNewMetadata(
       metadata->fill_value.push_back(std::move(converted_fill_value));
       return absl::OkStatus();
     }();
-    TENSORSTORE_RETURN_IF_ERROR(
-        status, tensorstore::MaybeAnnotateStatus(_, "Invalid fill_value"));
+    TENSORSTORE_RETURN_IF_ERROR(status).Format("Invalid fill_value");
   } else {
     metadata->fill_value.resize(metadata->dtype.fields.size());
   }
@@ -336,9 +336,9 @@ absl::Status ValidateSpecRankAndFieldInfo(SpecRankAndFieldInfo& info) {
       !RankConstraint::EqualOrUnspecified(
           info.full_rank,
           RankConstraint::Add(info.chunked_rank, info.field_rank))) {
-    return absl::InvalidArgumentError(
-        tensorstore::StrCat("Rank specified by schema (", info.full_rank,
-                            ") is not compatible with metadata"));
+    return absl::InvalidArgumentError(absl::StrFormat(
+        "Rank specified by schema (%d) is not compatible with metadata",
+        info.full_rank));
   }
 
   if (info.chunked_rank == dynamic_rank) {
@@ -484,8 +484,8 @@ absl::Status ValidateMetadataSchema(const ZarrMetadata& metadata,
 
   if (!RankConstraint::EqualOrUnspecified(schema.rank(), info.full_rank)) {
     return absl::FailedPreconditionError(
-        tensorstore::StrCat("Rank is ", info.full_rank,
-                            ", but schema specifies rank of ", schema.rank()));
+        absl::StrFormat("Rank is %d, but schema specifies rank of %d",
+                        info.full_rank, schema.rank()));
   }
 
   if (auto dtype = schema.dtype();
@@ -497,17 +497,14 @@ absl::Status ValidateMetadataSchema(const ZarrMetadata& metadata,
 
   if (schema.domain().valid()) {
     TENSORSTORE_RETURN_IF_ERROR(
-        GetDomainFromMetadata(info, metadata.shape, schema),
-        tensorstore::MaybeAnnotateStatus(
-            _, "domain from metadata does not match domain in schema"));
+        GetDomainFromMetadata(info, metadata.shape, schema))
+        .Format("domain from metadata does not match domain in schema");
   }
 
   if (auto schema_codec = schema.codec(); schema_codec.valid()) {
     auto codec = GetCodecSpecFromMetadata(metadata);
-    TENSORSTORE_RETURN_IF_ERROR(
-        codec.MergeFrom(schema_codec),
-        tensorstore::MaybeAnnotateStatus(
-            _, "codec from metadata does not match codec in schema"));
+    TENSORSTORE_RETURN_IF_ERROR(codec.MergeFrom(schema_codec))
+        .Format("codec from metadata does not match codec in schema");
   }
 
   if (auto schema_fill_value = schema.fill_value(); schema_fill_value.valid()) {
@@ -555,6 +552,7 @@ absl::Status ValidateMetadataSchema(const ZarrMetadata& metadata,
 namespace {
 std::string GetFieldNames(const ZarrDType& dtype) {
   std::vector<std::string> field_names;
+  field_names.reserve(dtype.fields.size());
   for (const auto& field : dtype.fields) {
     field_names.push_back(field.name);
   }
@@ -566,23 +564,23 @@ Result<size_t> GetFieldIndex(const ZarrDType& dtype,
                              const SelectedField& selected_field) {
   if (selected_field.empty()) {
     if (dtype.fields.size() != 1) {
-      return absl::FailedPreconditionError(tensorstore::StrCat(
-          "Must specify a \"field\" that is one of: ", GetFieldNames(dtype)));
+      return absl::FailedPreconditionError(absl::StrFormat(
+          "Must specify a \"field\" that is one of: %s", GetFieldNames(dtype)));
     }
     return 0;
   }
   if (!dtype.has_fields) {
-    return absl::FailedPreconditionError(
-        tensorstore::StrCat("Requested field ", QuoteString(selected_field),
-                            " but dtype does not have named fields"));
+    return absl::FailedPreconditionError(absl::StrFormat(
+        "Requested field %v but dtype does not have named fields",
+        QuoteString(selected_field)));
   }
   for (size_t field_index = 0; field_index < dtype.fields.size();
        ++field_index) {
     if (dtype.fields[field_index].name == selected_field) return field_index;
   }
   return absl::FailedPreconditionError(
-      tensorstore::StrCat("Requested field ", QuoteString(selected_field),
-                          " is not one of: ", GetFieldNames(dtype)));
+      absl::StrFormat("Requested field %v is not one of: %s",
+                      QuoteString(selected_field), GetFieldNames(dtype)));
 }
 
 Result<SelectedField> ParseSelectedField(const ::nlohmann::json& value) {
@@ -591,8 +589,8 @@ Result<SelectedField> ParseSelectedField(const ::nlohmann::json& value) {
     if (!s->empty()) return *s;
   }
   return absl::InvalidArgumentError(
-      tensorstore::StrCat("Expected null or non-empty string, but received: ",
-                          ::nlohmann::json(value).dump()));
+      absl::StrFormat("Expected null or non-empty string, but received: %s",
+                      ::nlohmann::json(value).dump()));
 }
 
 SelectedField EncodeSelectedField(size_t field_index, const ZarrDType& dtype) {

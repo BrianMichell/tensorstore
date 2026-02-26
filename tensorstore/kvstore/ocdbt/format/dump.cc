@@ -71,7 +71,8 @@ namespace {
 namespace jb = tensorstore::internal_json_binding;
 
 constexpr auto ConfigBinder = jb::Compose<ConfigConstraints>(
-    [](auto is_loading, const auto& options, auto* obj, auto* constraints) {
+    [](auto is_loading, const auto& options, auto* obj,
+       auto* constraints) -> absl::Status {
       if constexpr (is_loading) {
         TENSORSTORE_RETURN_IF_ERROR(CreateConfig(*constraints, {}, *obj));
         if (ConfigConstraints(*obj) != *constraints) {
@@ -221,22 +222,22 @@ constexpr auto LeafNodeValueReferenceBinder = jb::Variant(
                IndirectDataReferenceBinder(IndirectDataKind::kValue)));
 
 constexpr auto BtreeLeafNodeEntryBinder(std::string_view key_prefix) {
-  return
-      [=](std::false_type is_loading, const auto& options, auto* obj, auto* j) {
-        ::nlohmann::json::binary_t key;
-        key.insert(key.end(), key_prefix.begin(), key_prefix.end());
-        key.insert(key.end(), obj->key.begin(), obj->key.end());
-        ::nlohmann::json::object_t x{{"key", key}};
-        TENSORSTORE_RETURN_IF_ERROR(LeafNodeValueReferenceBinder(
-            std::false_type{}, IncludeDefaults{}, &obj->value_reference, &x));
-        *j = std::move(x);
-        return absl::OkStatus();
-      };
+  return [=](std::false_type is_loading, const auto& options, auto* obj,
+             auto* j) -> absl::Status {
+    ::nlohmann::json::binary_t key;
+    key.insert(key.end(), key_prefix.begin(), key_prefix.end());
+    key.insert(key.end(), obj->key.begin(), obj->key.end());
+    ::nlohmann::json::object_t x{{"key", key}};
+    TENSORSTORE_RETURN_IF_ERROR(LeafNodeValueReferenceBinder(
+        std::false_type{}, IncludeDefaults{}, &obj->value_reference, &x));
+    *j = std::move(x);
+    return absl::OkStatus();
+  };
 }
 
 constexpr auto BtreeInteriorNodeEntryBinder(std::string_view key_prefix) {
   return [=](std::false_type is_loading, const auto& options, auto* obj,
-             auto* j) {
+             auto* j) -> absl::Status {
     ::nlohmann::json::binary_t key;
     key.insert(key.end(), key_prefix.begin(), key_prefix.end());
     key.insert(key.end(), obj->key.begin(), obj->key.end());

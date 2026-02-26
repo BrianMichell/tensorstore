@@ -316,7 +316,7 @@ Result<TransformRep::Ptr<>> ComposeTransforms(TransformRep* b_to_c,
     return absl::Cord(str);
   };
 
-  internal::StatusBuilder builder(std::move(status));
+  StatusBuilder builder(std::move(status));
   builder.AddStatusPayload("transform", format_transform(a_to_b));
   if (!builder.GetPayload("domain").has_value()) {
     builder.AddStatusPayload("left_transform", format_transform(b_to_c));
