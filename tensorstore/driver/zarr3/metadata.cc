@@ -318,8 +318,19 @@ absl::Status FillValueJsonBinder::operator()(
           DecodeSingle(*j, dtype.fields[0].dtype, (*obj)[0]));
     }
   } else {
-    // For structured types, handle both array format and base64-encoded string
-    if (j->is_string()) {
+    // For struct types, handle object (primary), array, and base64 formats
+    if (j->is_object()) {
+      for (size_t i = 0; i < dtype.fields.size(); ++i) {
+        const auto& field = dtype.fields[i];
+        auto it = j->find(field.name);
+        if (it == j->end()) {
+          (*obj)[i] = tensorstore::AllocateArray(
+              span<const Index, 0>{}, c_order, value_init, field.dtype);
+        } else {
+          TENSORSTORE_RETURN_IF_ERROR(DecodeSingle(*it, field.dtype, (*obj)[i]));
+        }
+      }
+    } else if (j->is_string()) {
       // Decode base64-encoded fill value for entire struct
       std::string b64_decoded;
       if (!absl::Base64Unescape(j->get<std::string>(), &b64_decoded)) {
@@ -354,8 +365,8 @@ absl::Status FillValueJsonBinder::operator()(
             DecodeSingle((*j)[i], dtype.fields[i].dtype, (*obj)[i]));
       }
     } else {
-      return internal_json::ExpectedError(*j,
-                                          "array or base64-encoded string");
+      return internal_json::ExpectedError(
+          *j, "object with field names, array, or base64-encoded string");
     }
   }
   return absl::OkStatus();
@@ -368,13 +379,13 @@ absl::Status FillValueJsonBinder::operator()(
   if (dtype.fields.size() == 1) {
     return EncodeSingle((*obj)[0], dtype.fields[0].dtype, *j);
   }
-  // Structured fill value
-  *j = ::nlohmann::json::array();
+  // Struct fill value: use object format with field names
+  *j = ::nlohmann::json::object();
   for (size_t i = 0; i < dtype.fields.size(); ++i) {
     ::nlohmann::json item;
     TENSORSTORE_RETURN_IF_ERROR(
         EncodeSingle((*obj)[i], dtype.fields[i].dtype, item));
-    j->push_back(std::move(item));
+    (*j)[dtype.fields[i].name] = std::move(item);
   }
   return absl::OkStatus();
 }

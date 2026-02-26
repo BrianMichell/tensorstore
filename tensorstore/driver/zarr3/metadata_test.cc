@@ -649,4 +649,61 @@ TEST(FillValueTest, Float64) {
       /*other_nan_bits=*/0x7ff8000000000001);
 }
 
+ZarrDType MakeStructDType() {
+  ZarrDType dtype;
+  dtype.has_fields = true;
+  dtype.fields.resize(2);
+  dtype.fields[0].encoded_dtype = "int32";
+  dtype.fields[0].dtype = dtype_v<int32_t>;
+  dtype.fields[0].name = "x";
+  dtype.fields[0].num_bytes = 4;
+  dtype.fields[0].byte_offset = 0;
+  dtype.fields[0].num_inner_elements = 1;
+  dtype.fields[1].encoded_dtype = "float32";
+  dtype.fields[1].dtype = dtype_v<float32_t>;
+  dtype.fields[1].name = "y";
+  dtype.fields[1].num_bytes = 4;
+  dtype.fields[1].byte_offset = 4;
+  dtype.fields[1].num_inner_elements = 1;
+  dtype.bytes_per_outer_element = 8;
+  return dtype;
+}
+
+TEST(FillValueTest, StructObjectFormat) {
+  FillValueJsonBinder binder(MakeStructDType());
+
+  ::nlohmann::json object_json{{"x", 42}, {"y", 3.14}};
+  TENSORSTORE_ASSERT_OK_AND_ASSIGN(
+      auto fill_values,
+      jb::FromJson<std::vector<SharedArray<const void>>>(object_json, binder));
+  ASSERT_EQ(2, fill_values.size());
+  EXPECT_EQ(42, *static_cast<const int32_t*>(fill_values[0].data()));
+  EXPECT_FLOAT_EQ(3.14f, *static_cast<const float32_t*>(fill_values[1].data()));
+
+  TENSORSTORE_ASSERT_OK_AND_ASSIGN(auto encoded, jb::ToJson(fill_values, binder));
+  EXPECT_TRUE(encoded.is_object());
+  EXPECT_EQ(42, encoded["x"]);
+  EXPECT_FLOAT_EQ(3.14f, encoded["y"].get<float>());
+
+  ::nlohmann::json array_json = ::nlohmann::json::array({42, 3.14});
+  TENSORSTORE_ASSERT_OK_AND_ASSIGN(
+      auto fill_values_from_array,
+      jb::FromJson<std::vector<SharedArray<const void>>>(array_json, binder));
+  ASSERT_EQ(2, fill_values_from_array.size());
+  EXPECT_EQ(42, *static_cast<const int32_t*>(fill_values_from_array[0].data()));
+  EXPECT_FLOAT_EQ(3.14f, *static_cast<const float32_t*>(fill_values_from_array[1].data()));
+}
+
+TEST(FillValueTest, StructObjectFormatOmittedFields) {
+  FillValueJsonBinder binder(MakeStructDType());
+
+  ::nlohmann::json partial_json{{"x", 42}};
+  TENSORSTORE_ASSERT_OK_AND_ASSIGN(
+      auto fill_values,
+      jb::FromJson<std::vector<SharedArray<const void>>>(partial_json, binder));
+  ASSERT_EQ(2, fill_values.size());
+  EXPECT_EQ(42, *static_cast<const int32_t*>(fill_values[0].data()));
+  EXPECT_FLOAT_EQ(0.0f, *static_cast<const float32_t*>(fill_values[1].data()));
+}
+
 }  // namespace

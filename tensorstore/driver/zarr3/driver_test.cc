@@ -1899,7 +1899,7 @@ TEST(Zarr3DriverTest, OpenAsVoidStructuredType) {
       {"metadata",
        {
            {"data_type",
-            {{"name", "structured"},
+            {{"name", "struct"},
              {"configuration",
               {{"fields",
                 ::nlohmann::json::array({{"x", "uint8"}, {"y", "int16"}})}}}}},
@@ -2141,7 +2141,7 @@ TEST(Zarr3DriverTest, OpenAsVoidCannotUseWithField) {
       {"metadata",
        {
            {"data_type",
-            {{"name", "structured"},
+            {{"name", "struct"},
              {"configuration",
               {{"fields",
                 ::nlohmann::json::array({{"x", "uint8"}, {"y", "int16"}})}}}}},
@@ -2406,7 +2406,7 @@ TEST(Zarr3DriverTest, FieldSelectionUrlNotSupported) {
       {"metadata",
        {
            {"data_type",
-            {{"name", "structured"},
+            {{"name", "struct"},
              {"configuration",
               {{"fields",
                 ::nlohmann::json::array({{"x", "uint8"}, {"y", "int16"}})}}}}},
@@ -2462,7 +2462,7 @@ TEST(Zarr3DriverTest, GetSpecInfoOpenAsVoidWithStructuredDtype) {
       {"metadata",
        {
            {"data_type",
-            {{"name", "structured"},
+            {{"name", "struct"},
              {"configuration",
               {{"fields",
                 ::nlohmann::json::array({{"x", "int32"}, {"y", "uint16"}})}}}}},

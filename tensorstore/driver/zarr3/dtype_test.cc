@@ -102,6 +102,22 @@ void CheckDType(const ::nlohmann::json& json, const ZarrDType& expected) {
   EXPECT_EQ(json, ::nlohmann::json(dtype));
 }
 
+void CheckDTypeParseOnly(const ::nlohmann::json& json,
+                         const ZarrDType& expected) {
+  SCOPED_TRACE(json.dump());
+  TENSORSTORE_ASSERT_OK_AND_ASSIGN(auto dtype, ParseDType(json));
+  EXPECT_EQ(expected, dtype);
+}
+
+void CheckDTypeWithExpectedOutput(const ::nlohmann::json& input,
+                                  const ::nlohmann::json& expected_output,
+                                  const ZarrDType& expected) {
+  SCOPED_TRACE(input.dump());
+  TENSORSTORE_ASSERT_OK_AND_ASSIGN(auto dtype, ParseDType(input));
+  EXPECT_EQ(expected, dtype);
+  EXPECT_EQ(expected_output, ::nlohmann::json(dtype));
+}
+
 TEST(ParseDType, SimpleStringBool) {
   CheckDType("bool", ZarrDType{
                          /*.has_fields=*/false,
@@ -125,59 +141,83 @@ TEST(ParseDType, SimpleStringBool) {
 
 TEST(ParseDType, SingleNamedFieldChar) {
   // Zarr 3 doesn't support fixed size strings natively in core, so we use uint8 for testing bytes
-  CheckDType(::nlohmann::json::array_t{{"x", "uint8"}},
-             ZarrDType{
-                 /*.has_fields=*/true,
-                 /*.fields=*/
-                 {
-                     {{
-                          /*.encoded_dtype=*/"uint8",
-                          /*.dtype=*/dtype_v<uint8_t>,
-                          /*.flexible_shape=*/{},
-                      },
-                      /*.outer_shape=*/{},
-                      /*.name=*/"x",
-                      /*.field_shape=*/{},
-                      /*.num_inner_elements=*/1,
-                      /*.byte_offset=*/0,
-                      /*.num_bytes=*/1},
-                 },
-                 /*.bytes_per_outer_element=*/1,
-             });
+  // Legacy array format should parse, but serialize to object format with "struct" name
+  ZarrDType expected{
+      /*.has_fields=*/true,
+      /*.fields=*/
+      {
+          {{
+               /*.encoded_dtype=*/"uint8",
+               /*.dtype=*/dtype_v<uint8_t>,
+               /*.flexible_shape=*/{},
+           },
+           /*.outer_shape=*/{},
+           /*.name=*/"x",
+           /*.field_shape=*/{},
+           /*.num_inner_elements=*/1,
+           /*.byte_offset=*/0,
+           /*.num_bytes=*/1},
+      },
+      /*.bytes_per_outer_element=*/1,
+  };
+  // Test legacy array format (parse only)
+  CheckDTypeParseOnly(::nlohmann::json::array_t{{"x", "uint8"}}, expected);
+  // Test new "struct" object format (full round trip)
+  ::nlohmann::json struct_format{
+      {"name", "struct"},
+      {"configuration", {{"fields", ::nlohmann::json::array_t{{"x", "uint8"}}}}}
+  };
+  CheckDType(struct_format, expected);
+  // Test legacy "structured" alias (parse only)
+  ::nlohmann::json structured_format{
+      {"name", "structured"},
+      {"configuration", {{"fields", ::nlohmann::json::array_t{{"x", "uint8"}}}}}
+  };
+  CheckDTypeWithExpectedOutput(structured_format, struct_format, expected);
 }
 
 TEST(ParseDType, TwoNamedFields) {
-  CheckDType(
+  ZarrDType expected{
+      /*.has_fields=*/true,
+      /*.fields=*/
+      {
+          {{
+               /*.encoded_dtype=*/"int8",
+               /*.dtype=*/dtype_v<int8_t>,
+               /*.flexible_shape=*/{},
+           },
+           /*.outer_shape=*/{2, 3},
+           /*.name=*/"x",
+           /*.field_shape=*/{2, 3},
+           /*.num_inner_elements=*/2 * 3,
+           /*.byte_offset=*/0,
+           /*.num_bytes=*/1 * 2 * 3},
+          {{
+               /*.encoded_dtype=*/"int16",
+               /*.dtype=*/dtype_v<int16_t>,
+               /*.flexible_shape=*/{},
+           },
+           /*.outer_shape=*/{5},
+           /*.name=*/"y",
+           /*.field_shape=*/{5},
+           /*.num_inner_elements=*/5,
+           /*.byte_offset=*/1 * 2 * 3,
+           /*.num_bytes=*/2 * 5},
+      },
+      /*.bytes_per_outer_element=*/1 * 2 * 3 + 2 * 5,
+  };
+  // Test legacy array format (parse only)
+  CheckDTypeParseOnly(
       ::nlohmann::json::array_t{{"x", "int8", {2, 3}}, {"y", "int16", {5}}},
-      ZarrDType{
-          /*.has_fields=*/true,
-          /*.fields=*/
-          {
-              {{
-                   /*.encoded_dtype=*/"int8",
-                   /*.dtype=*/dtype_v<int8_t>,
-                   /*.flexible_shape=*/{},
-               },
-               /*.outer_shape=*/{2, 3},
-               /*.name=*/"x",
-               /*.field_shape=*/{2, 3},
-               /*.num_inner_elements=*/2 * 3,
-               /*.byte_offset=*/0,
-               /*.num_bytes=*/1 * 2 * 3},
-              {{
-                   /*.encoded_dtype=*/"int16",
-                   /*.dtype=*/dtype_v<int16_t>,
-                   /*.flexible_shape=*/{},
-               },
-               /*.outer_shape=*/{5},
-               /*.name=*/"y",
-               /*.field_shape=*/{5},
-               /*.num_inner_elements=*/5,
-               /*.byte_offset=*/1 * 2 * 3,
-               /*.num_bytes=*/2 * 5},
-          },
-          /*.bytes_per_outer_element=*/1 * 2 * 3 + 2 * 5,
-      });
+      expected);
+  // Test new "struct" object format (full round trip)
+  ::nlohmann::json struct_format{
+      {"name", "struct"},
+      {"configuration",
+       {{"fields",
+         ::nlohmann::json::array_t{{"x", "int8", {2, 3}}, {"y", "int16", {5}}}}}}
+  };
+  CheckDType(struct_format, expected);
 }
 
 TEST(ParseDType, FieldSpecTooShort) {

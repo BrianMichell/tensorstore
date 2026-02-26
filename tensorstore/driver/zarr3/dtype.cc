@@ -122,15 +122,15 @@ absl::Status ParseFieldsArray(const nlohmann::json& fields_json,
   out.has_fields = true;
   return internal_json::JsonParseArray(
       fields_json,
-      [&](ptrdiff_t size) {
+      [&](ptrdiff_t size) -> absl::Status {
         out.fields.resize(size);
         return absl::OkStatus();
       },
-      [&](const ::nlohmann::json& x, ptrdiff_t field_i) {
+      [&](const ::nlohmann::json& x, ptrdiff_t field_i) -> absl::Status {
         auto& field = out.fields[field_i];
         return internal_json::JsonParseArray(
             x,
-            [&](ptrdiff_t size) {
+            [&](ptrdiff_t size) -> absl::Status {
               if (size < 2 || size > 3) {
                 return absl::InvalidArgumentError(absl::StrFormat(
                     "Expected array of size 2 or 3, but received: %s",
@@ -138,7 +138,7 @@ absl::Status ParseFieldsArray(const nlohmann::json& fields_json,
               }
               return absl::OkStatus();
             },
-            [&](const ::nlohmann::json& v, ptrdiff_t i) {
+            [&](const ::nlohmann::json& v, ptrdiff_t i) -> absl::Status {
               switch (i) {
                 case 0:
                   if (internal_json::JsonRequireValueAs(v, &field.name).ok()) {
@@ -158,11 +158,11 @@ absl::Status ParseFieldsArray(const nlohmann::json& fields_json,
                 case 2: {
                   return internal_json::JsonParseArray(
                       v,
-                      [&](ptrdiff_t size) {
+                      [&](ptrdiff_t size) -> absl::Status {
                         field.outer_shape.resize(size);
                         return absl::OkStatus();
                       },
-                      [&](const ::nlohmann::json& x, ptrdiff_t j) {
+                      [&](const ::nlohmann::json& x, ptrdiff_t j) -> absl::Status {
                         return internal_json::JsonRequireInteger(
                             x, &field.outer_shape[j], /*strict=*/true, 1,
                             kInfIndex);
@@ -186,18 +186,19 @@ Result<ZarrDType> ParseDTypeNoDerived(const nlohmann::json& value) {
         ParseBaseDType(value.get<std::string>()));
     return out;
   }
-  // Handle extended object format:
-  // {"name": "structured", "configuration": {"fields": [...]}}
+  // Handle extended object format for multi-field types:
+  // {"name": "struct", "configuration": {"fields": [...]}}
+  // Also accepts legacy "structured" name for read only compatibility.
   if (value.is_object()) {
     if (value.contains("name") && value.contains("configuration")) {
       std::string type_name;
       TENSORSTORE_RETURN_IF_ERROR(
           internal_json::JsonRequireValueAs(value["name"], &type_name));
-      if (type_name == "structured") {
+      if (type_name == "struct" || type_name == "structured") {
         const auto& config = value["configuration"];
         if (!config.is_object() || !config.contains("fields")) {
           return absl::InvalidArgumentError(
-              "Structured data type requires 'configuration' object with "
+              "\"struct\" data type requires 'configuration' object with "
               "'fields' array");
         }
         TENSORSTORE_RETURN_IF_ERROR(ParseFieldsArray(config["fields"], out));
@@ -315,7 +316,9 @@ void to_json(::nlohmann::json& out,  // NOLINT
   if (!dtype.has_fields) {
     out = dtype.fields[0].encoded_dtype;
   } else {
-    out = dtype.fields;
+    out = ::nlohmann::json{
+        {"name", "struct"},
+        {"configuration", {{"fields", dtype.fields}}}};
   }
 }
 
