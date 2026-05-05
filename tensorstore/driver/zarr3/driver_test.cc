@@ -1883,6 +1883,10 @@ TEST(DriverTest, UrlSchemeRoundtrip) {
 }
 
 TEST(Zarr3OpenAsVoidTest, SimpleType) {
+  // Per the zarr v3 open_as_void spec, opening a plain scalar dtype with
+  // `open_as_void` succeeds and yields a `byte` array whose innermost
+  // dimension equals the scalar's byte width.  For int16 (2 bytes), an
+  // array of shape [4, 4] becomes byte-shape [4, 4, 2].
   auto context = Context::Default();
 
   ::nlohmann::json create_spec{
@@ -1909,12 +1913,17 @@ TEST(Zarr3OpenAsVoidTest, SimpleType) {
       {"open_as_void", true},
   };
 
-  EXPECT_THAT(tensorstore::Open(void_spec, context, tensorstore::OpenMode::open,
-                                tensorstore::ReadWriteMode::read)
-                  .result(),
-              tensorstore::MatchesStatus(
-                  absl::StatusCode::kInvalidArgument,
-                  ".*open_as_void is only supported for structured dtypes.*"));
+  TENSORSTORE_ASSERT_OK_AND_ASSIGN(
+      auto void_store,
+      tensorstore::Open(void_spec, context, tensorstore::OpenMode::open,
+                        tensorstore::ReadWriteMode::read)
+          .result());
+
+  EXPECT_EQ(tensorstore::dtype_v<tensorstore::dtypes::byte_t>,
+            void_store.dtype());
+  EXPECT_EQ(3, void_store.rank());
+  EXPECT_THAT(void_store.domain().shape(),
+              ::testing::ElementsAre(4, 4, 2));
 }
 
 TEST(Zarr3OpenAsVoidTest, StructuredType) {
@@ -2716,11 +2725,12 @@ TEST(Zarr3OpenAsVoidTest, IncompatibleMetadata) {
               StatusIs(absl::StatusCode::kFailedPrecondition));
 }
 
-TEST(Zarr3OpenAsVoidTest, WithShardingRejectsSimpleType) {
-  // Test that open_as_void with sharding correctly rejects simple dtypes.
+TEST(Zarr3OpenAsVoidTest, WithShardingSimpleType) {
+  // Per the zarr v3 open_as_void spec, simple dtypes are also supported even
+  // when wrapped in a sharding_indexed codec.  For int32 (4 bytes) shape
+  // [8,8] with sub-chunks [4,4], the void view has shape [8,8,4] of `byte`.
   auto context = Context::Default();
 
-  // Create a sharded array with simple dtype
   ::nlohmann::json create_spec{
       {"driver", "zarr3"},
       {"kvstore", {{"driver", "memory"}, {"path", "prefix/"}}},
@@ -2746,7 +2756,6 @@ TEST(Zarr3OpenAsVoidTest, WithShardingRejectsSimpleType) {
                         tensorstore::ReadWriteMode::read_write)
           .result());
 
-  // Write some data
   auto data = tensorstore::MakeArray<int32_t>(
       {{1, 2, 0, 0, 0, 0, 0, 0},
        {3, 4, 0, 0, 0, 0, 0, 0},
@@ -2758,19 +2767,23 @@ TEST(Zarr3OpenAsVoidTest, WithShardingRejectsSimpleType) {
        {0, 0, 0, 0, 0, 0, 0, 0}});
   TENSORSTORE_EXPECT_OK(tensorstore::Write(data, store).result());
 
-  // Attempt to open with open_as_void=true - should fail for simple dtype
   ::nlohmann::json void_spec{
       {"driver", "zarr3"},
       {"kvstore", {{"driver", "memory"}, {"path", "prefix/"}}},
       {"open_as_void", true},
   };
 
-  EXPECT_THAT(tensorstore::Open(void_spec, context, tensorstore::OpenMode::open,
-                                tensorstore::ReadWriteMode::read)
-                  .result(),
-              tensorstore::MatchesStatus(
-                  absl::StatusCode::kInvalidArgument,
-                  ".*open_as_void is only supported for structured dtypes.*"));
+  TENSORSTORE_ASSERT_OK_AND_ASSIGN(
+      auto void_store,
+      tensorstore::Open(void_spec, context, tensorstore::OpenMode::open,
+                        tensorstore::ReadWriteMode::read)
+          .result());
+
+  EXPECT_EQ(tensorstore::dtype_v<tensorstore::dtypes::byte_t>,
+            void_store.dtype());
+  EXPECT_EQ(3, void_store.rank());
+  EXPECT_THAT(void_store.domain().shape(),
+              ::testing::ElementsAre(8, 8, 4));
 }
 
 TEST(Zarr3OpenAsVoidTest, InvalidSchema) {
@@ -2899,11 +2912,16 @@ TEST(Zarr3OpenAsVoidTest, StructBigEndian) {
   EXPECT_THAT(byte_array, MatchesArray(expected_array));
 }
 
-TEST(Zarr3OpenAsVoidTest, ShardedSubChunkShapeExtension) {
+TEST(Zarr3OpenAsVoidTest, ShardedSubChunkShapeIsUserForm) {
+  // The sharding_indexed `chunk_shape` exposed in the round-tripped spec is
+  // the user-facing form (the chunked dimensions only), not the codec's
+  // internally extended form.  This keeps zarr.json round-trips and
+  // user-provided spec constraints in a single canonical representation.
+  // For a struct{x: uint8, y: int16} with sub-chunk shape [4, 4], the spec
+  // round-trips as [4, 4] regardless of whether opened normally or via
+  // open_as_void.
   auto context = Context::Default();
 
-  // Create sharded structured array.
-  // Struct: x (uint8), y (int16) -> 3 bytes.
   ::nlohmann::json create_spec{
       {"driver", "zarr3"},
       {"kvstore", {{"driver", "memory"}, {"path", "prefix_shard/"}}},
@@ -2933,7 +2951,6 @@ TEST(Zarr3OpenAsVoidTest, ShardedSubChunkShapeExtension) {
                         tensorstore::ReadWriteMode::read_write)
           .result());
 
-  // Open as void.
   ::nlohmann::json void_spec{
       {"driver", "zarr3"},
       {"kvstore", {{"driver", "memory"}, {"path", "prefix_shard/"}}},
@@ -2946,15 +2963,13 @@ TEST(Zarr3OpenAsVoidTest, ShardedSubChunkShapeExtension) {
                         tensorstore::ReadWriteMode::read)
           .result());
 
-  // Spec should have sub_chunk_shape extended with the bytes dimension [4, 4,
-  // 3]
   TENSORSTORE_ASSERT_OK_AND_ASSIGN(auto spec, void_store.spec());
   TENSORSTORE_ASSERT_OK_AND_ASSIGN(auto spec_json, spec.ToJson());
   EXPECT_THAT(
       spec_json["metadata"]["codecs"],
       ::testing::Contains(JsonSubValuesMatch(
           {{"/name", "sharding_indexed"},
-           {"/configuration/chunk_shape", ::nlohmann::json({4, 4, 3})}})));
+           {"/configuration/chunk_shape", ::nlohmann::json({4, 4})}})));
 }
 
 // Helper: returns a JSON spec for creating a sharded structured array.

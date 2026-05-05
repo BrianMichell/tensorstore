@@ -232,11 +232,14 @@ Result<span<const DimensionIndex>> ResolveOrder(
 absl::Status TransposeCodecSpec::PropagateDataTypeAndShape(
     const ArrayDataTypeAndShapeInfo& decoded,
     ArrayDataTypeAndShapeInfo& encoded) const {
+  // The user permutation operates strictly on the chunked dimensions; any
+  // `inner_shape` contributed by the dtype is propagated as-is.
   DimensionIndex temp_perm[kMaxRank];
   TENSORSTORE_ASSIGN_OR_RETURN(
       auto order, ResolveOrder(options.order, decoded.rank, temp_perm));
   encoded.dtype = decoded.dtype;
   encoded.rank = order.size();
+  encoded.inner_shape = decoded.inner_shape;
   if (decoded.shape) {
     auto& encoded_shape = encoded.shape.emplace();
     const auto& decoded_shape = *decoded.shape;
@@ -299,11 +302,14 @@ absl::Status TransposeCodecSpec::GetDecodedChunkLayout(
 Result<ZarrArrayToArrayCodec::Ptr> TransposeCodecSpec::Resolve(
     ArrayCodecResolveParameters&& decoded, ArrayCodecResolveParameters& encoded,
     ZarrArrayToArrayCodecSpec::Ptr* resolved_spec) const {
+  // Spec-level resolution is at the chunked rank only; the user permutation
+  // never touches inner (`field_shape`) dimensions.
   DimensionIndex temp_perm[kMaxRank];
   TENSORSTORE_ASSIGN_OR_RETURN(
       auto order, ResolveOrder(options.order, decoded.rank, temp_perm));
   encoded.dtype = decoded.dtype;
   encoded.rank = decoded.rank;
+  encoded.inner_shape = decoded.inner_shape;
   assert(decoded.fill_value.rank() == 0);
   encoded.fill_value = std::move(decoded.fill_value);
   std::vector<DimensionIndex> inverse_order(order.size());
@@ -318,7 +324,22 @@ Result<ZarrArrayToArrayCodec::Ptr> TransposeCodecSpec::Resolve(
     resolved_spec->reset(new TransposeCodecSpec({TransposeCodecSpec::Order(
         std::vector<DimensionIndex>(order.begin(), order.end()))}));
   }
-  return internal::MakeIntrusivePtr<TransposeCodec>(std::move(inverse_order));
+  // Build the runtime permutation at the *runtime* rank: chunked dims permuted
+  // as the user requested, inner (`field_shape`) dims pinned at the trailing
+  // positions with identity.  The chunk cache hands extended-rank arrays to
+  // the codec at runtime; the runtime codec must therefore accept the extended
+  // rank without altering the inner dims.
+  const DimensionIndex chunked_rank = decoded.rank;
+  const DimensionIndex inner_rank =
+      static_cast<DimensionIndex>(decoded.inner_shape.size());
+  std::vector<DimensionIndex> runtime_inverse_order(chunked_rank + inner_rank);
+  std::copy(inverse_order.begin(), inverse_order.end(),
+            runtime_inverse_order.begin());
+  for (DimensionIndex i = 0; i < inner_rank; ++i) {
+    runtime_inverse_order[chunked_rank + i] = chunked_rank + i;
+  }
+  return internal::MakeIntrusivePtr<TransposeCodec>(
+      std::move(runtime_inverse_order));
 }
 
 TENSORSTORE_GLOBAL_INITIALIZER {

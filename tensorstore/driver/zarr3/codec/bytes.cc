@@ -79,6 +79,10 @@ absl::Status BytesCodecSpec::GetDecodedChunkLayout(
       !internal::IsTrivialDataType(array_info.dtype)) {
     return InvalidDataTypeError(array_info.dtype);
   }
+  // `array_info.rank` is the chunked rank only; any inner (`field_shape`)
+  // dims are reported via `array_info.inner_shape` and do not appear in the
+  // chunk layout info (they are pinned, identity-ordered, and carry no
+  // user-tunable layout).
   const DimensionIndex rank = array_info.rank;
   if (rank != dynamic_rank) {
     auto& inner_order = decoded.inner_order.emplace();

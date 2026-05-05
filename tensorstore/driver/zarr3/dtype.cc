@@ -366,6 +366,16 @@ Result<ZarrDType> ParseDTypeNoDerived(const nlohmann::json& value) {
 }  // namespace
 
 absl::Status ValidateDType(ZarrDType& dtype) {
+  // Invariant: every valid zarr v3 dtype has at least one field.  All JSON
+  // parser entry points enforce this (`ValidateFieldsArrayNotEmpty` for
+  // struct/structured, single-field `resize(1)` for scalar / raw_bytes).
+  // This guard catches future programmatic constructions of `ZarrDType`
+  // that bypass the parser, so that consumers indexing `fields[0]` get a
+  // clean error rather than out-of-bounds access.
+  if (dtype.fields.empty()) {
+    return absl::FailedPreconditionError(
+        "zarr3 data type must have at least one field");
+  }
   dtype.bytes_per_outer_element = 0;
   for (size_t field_i = 0; field_i < dtype.fields.size(); ++field_i) {
     auto& field = dtype.fields[field_i];
