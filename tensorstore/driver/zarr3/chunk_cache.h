@@ -207,12 +207,6 @@ class ZarrLeafChunkCache : public internal::KvsBackedChunkCache,
 
   ZarrCodecChain::PreparedState::Ptr codec_state_;
   ZarrDType dtype_;
-  // Inner trailing dims contributed by the dtype to the codec resolution
-  // shape -- the same vector that lives on `ZarrMetadata::field_shape`.
-  // Empty for plain scalar single-field arrays; `{bytes_per_outer_element}`
-  // for multi-field structs and the byte-substituted void view; the per-
-  // field `field_shape` for `rN` raw byte fields.  Used only to gate the
-  // "fast path" (no byte interleaving) vs the byte-packing path.
   std::vector<Index> field_shape_;
 };
 
@@ -275,10 +269,6 @@ class ZarrShardedChunkCache : public internal::Cache, public ZarrChunkCache {
   kvstore::DriverPtr base_kvstore_;
   ZarrCodecChain::PreparedState::Ptr codec_state_;
   ZarrDType dtype_;
-  // Same semantics as `ZarrLeafChunkCache::field_shape_`: the metadata-level
-  // inner trailing dims used to gate the byte-packing decode/encode path
-  // and to determine how many trailing dims the sharding sub-chunk grid
-  // carries.
   std::vector<Index> field_shape_;
 
   // Data cache pool, if it differs from `this->pool()` (which is equal to the
@@ -288,21 +278,9 @@ class ZarrShardedChunkCache : public internal::Cache, public ZarrChunkCache {
 
 /// Chunk cache mixin for a chunk cache where the entire chunk cache corresponds
 /// to a single shard.
-///
-/// The sharding codec's `sub_chunk_grid` is a single-component grid whose
-/// component shape includes any trailing `field_shape` dimensions contributed
-/// by the dtype.  This mixin replaces it with a field-level grid built
-/// directly from the dtype (`CreateFieldGridSpecification`), so that the
-/// surrounding code path operates on per-field typed arrays regardless of
-/// whether the chunk is a multi-field struct, an `rN` raw byte field, or a
-/// plain scalar.
 template <typename ChunkCacheImpl>
 class ZarrShardSubChunkCache : public ChunkCacheImpl {
  public:
-  /// Wraps the sharding state's key parser to pad spatial-only cell indices
-  /// (from a field-level grid) to the full dimensionality expected by the
-  /// shard index (which includes any trailing field_shape dimensions with
-  /// index 0).
   class FieldKeyParserWrapper
       : public internal::LexicographicalGridIndexKeyParser {
    public:
@@ -350,11 +328,6 @@ class ZarrShardSubChunkCache : public ChunkCacheImpl {
                        std::move(data_cache_pool)),
         sharding_state_(std::move(sharding_state)),
         executor_(std::move(executor)) {
-    // Strip any trailing inner dimensions contributed by `field_shape_` from
-    // the sharding codec's sub-chunk grid to get the spatial (chunked-only)
-    // rank.  `field_shape_` is the metadata-level inner shape vector --
-    // empty for plain scalars, single-element for current zarr v3 cases
-    // (`{bytes_per_outer_element}` for structs/void, `{N}` for `rN`).
     const auto& field_shape_ref = ChunkCacheImpl::field_shape_;
     const auto& original_grid = *sharding_state_->sub_chunk_grid;
     const DimensionIndex full_rank = original_grid.chunk_shape.size();

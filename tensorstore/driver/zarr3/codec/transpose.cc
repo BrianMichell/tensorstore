@@ -232,8 +232,6 @@ Result<span<const DimensionIndex>> ResolveOrder(
 absl::Status TransposeCodecSpec::PropagateDataTypeAndShape(
     const ArrayDataTypeAndShapeInfo& decoded,
     ArrayDataTypeAndShapeInfo& encoded) const {
-  // The user permutation operates strictly on the chunked dimensions; any
-  // `inner_shape` contributed by the dtype is propagated as-is.
   DimensionIndex temp_perm[kMaxRank];
   TENSORSTORE_ASSIGN_OR_RETURN(
       auto order, ResolveOrder(options.order, decoded.rank, temp_perm));
@@ -302,8 +300,6 @@ absl::Status TransposeCodecSpec::GetDecodedChunkLayout(
 Result<ZarrArrayToArrayCodec::Ptr> TransposeCodecSpec::Resolve(
     ArrayCodecResolveParameters&& decoded, ArrayCodecResolveParameters& encoded,
     ZarrArrayToArrayCodecSpec::Ptr* resolved_spec) const {
-  // Spec-level resolution is at the chunked rank only; the user permutation
-  // never touches inner (`field_shape`) dimensions.
   DimensionIndex temp_perm[kMaxRank];
   TENSORSTORE_ASSIGN_OR_RETURN(
       auto order, ResolveOrder(options.order, decoded.rank, temp_perm));
@@ -324,11 +320,6 @@ Result<ZarrArrayToArrayCodec::Ptr> TransposeCodecSpec::Resolve(
     resolved_spec->reset(new TransposeCodecSpec({TransposeCodecSpec::Order(
         std::vector<DimensionIndex>(order.begin(), order.end()))}));
   }
-  // Build the runtime permutation at the *runtime* rank: chunked dims permuted
-  // as the user requested, inner (`field_shape`) dims pinned at the trailing
-  // positions with identity.  The chunk cache hands extended-rank arrays to
-  // the codec at runtime; the runtime codec must therefore accept the extended
-  // rank without altering the inner dims.
   const DimensionIndex chunked_rank = decoded.rank;
   const DimensionIndex inner_rank =
       static_cast<DimensionIndex>(decoded.inner_shape.size());

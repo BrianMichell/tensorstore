@@ -1883,10 +1883,6 @@ TEST(DriverTest, UrlSchemeRoundtrip) {
 }
 
 TEST(Zarr3OpenAsVoidTest, SimpleType) {
-  // Per the zarr v3 open_as_void spec, opening a plain scalar dtype with
-  // `open_as_void` succeeds and yields a `byte` array whose innermost
-  // dimension equals the scalar's byte width.  For int16 (2 bytes), an
-  // array of shape [4, 4] becomes byte-shape [4, 4, 2].
   auto context = Context::Default();
 
   ::nlohmann::json create_spec{
@@ -2574,7 +2570,7 @@ TEST(Zarr3OpenAsVoidTest, GetSpecInfoRankConsistency) {
   EXPECT_EQ(4, void_spec.rank());
 }
 
-TEST(Zarr3OpenAsVoidTest, FillValue) {  // TODO: We need to define behavior for whether fill_value is required always for struct dtype.
+TEST(Zarr3OpenAsVoidTest, FillValue) {
   // Test that fill_value is correctly obtained from metadata when using
   // open_as_void. The void access should get the fill_value representing
   // the raw bytes of the original fill_value.
@@ -2726,9 +2722,6 @@ TEST(Zarr3OpenAsVoidTest, IncompatibleMetadata) {
 }
 
 TEST(Zarr3OpenAsVoidTest, WithShardingSimpleType) {
-  // Per the zarr v3 open_as_void spec, simple dtypes are also supported even
-  // when wrapped in a sharding_indexed codec.  For int32 (4 bytes) shape
-  // [8,8] with sub-chunks [4,4], the void view has shape [8,8,4] of `byte`.
   auto context = Context::Default();
 
   ::nlohmann::json create_spec{
@@ -2913,13 +2906,6 @@ TEST(Zarr3OpenAsVoidTest, StructBigEndian) {
 }
 
 TEST(Zarr3OpenAsVoidTest, ShardedSubChunkShapeIsUserForm) {
-  // The sharding_indexed `chunk_shape` exposed in the round-tripped spec is
-  // the user-facing form (the chunked dimensions only), not the codec's
-  // internally extended form.  This keeps zarr.json round-trips and
-  // user-provided spec constraints in a single canonical representation.
-  // For a struct{x: uint8, y: int16} with sub-chunk shape [4, 4], the spec
-  // round-trips as [4, 4] regardless of whether opened normally or via
-  // open_as_void.
   auto context = Context::Default();
 
   ::nlohmann::json create_spec{
@@ -3680,9 +3666,6 @@ TEST(Zarr3StructuredTest, ShardedOpenAsVoidNoFieldCreate) {
 }
 
 TEST(Zarr3StructuredTest, ShardedWiderFieldRoundtrip) {
-  // Use {uint8, int32} so bytes_per_element=5, which is distinct from rank=3.
-  // This breaks the coincidental alignment in other tests where
-  // bytes_per_element=3 and the void rank is also 3.
   auto context = Context::Default();
 
   ::nlohmann::json base_spec{
