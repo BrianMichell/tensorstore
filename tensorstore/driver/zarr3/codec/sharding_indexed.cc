@@ -179,9 +179,6 @@ absl::Status ShardingIndexedCodecSpec::MergeFrom(const ZarrCodecSpec& other,
                                                  bool strict) {
   using Self = ShardingIndexedCodecSpec;
   const auto& other_options = static_cast<const Self&>(other).options;
-  // `sub_chunk_shape` lives at the chunked rank in both the on-disk
-  // zarr.json and the user-facing spec; the codec resolution path no longer
-  // extends it internally, so plain equality is sufficient.
   TENSORSTORE_RETURN_IF_ERROR(MergeConstraint<&Options::sub_chunk_shape>(
       "chunk_shape", options, other_options));
   TENSORSTORE_RETURN_IF_ERROR(
@@ -217,11 +214,6 @@ const ZarrCodecChainSpec* ShardingIndexedCodecSpec::GetSubChunkCodecs() const {
 absl::Status ShardingIndexedCodecSpec::GetDecodedChunkLayout(
     const ArrayDataTypeAndShapeInfo& array_info,
     ArrayCodecChunkLayoutInfo& decoded) const {
-  // `array_info.rank` is the chunked rank only; inner (`field_shape`) dims
-  // travel via `array_info.inner_shape` and are propagated unchanged through
-  // sub-chunk codecs without ever being permuted or reshaped.  The codec
-  // spec's `sub_chunk_shape` is therefore at the same chunked rank as
-  // `array_info.rank`.
   if (options.sub_chunk_shape &&
       static_cast<DimensionIndex>(options.sub_chunk_shape->size()) !=
           array_info.rank) {
@@ -262,11 +254,6 @@ Result<ZarrArrayToBytesCodec::Ptr> ShardingIndexedCodecSpec::Resolve(
     resolved_options = &resolved_spec_ptr->options;
     resolved_spec->reset(resolved_spec_ptr);
   }
-  // `decoded.rank` is the chunked rank only.  Inner (`field_shape`) dims are
-  // carried separately on `decoded.inner_shape`, propagated through to the
-  // sub-chunk codec chain unchanged, and consumed at the leaf "array ->
-  // bytes" codec for byte-stream sizing.  The codec spec's `sub_chunk_shape`
-  // is at the same chunked rank.
   span<const Index> sub_chunk_shape;
   if (options.sub_chunk_shape) {
     sub_chunk_shape = *options.sub_chunk_shape;
@@ -279,10 +266,6 @@ Result<ZarrArrayToBytesCodec::Ptr> ShardingIndexedCodecSpec::Resolve(
   if (static_cast<DimensionIndex>(sub_chunk_shape.size()) != decoded.rank) {
     return SubChunkRankMismatch(sub_chunk_shape, decoded.rank);
   }
-  // The runtime ChunkGridSpecification partitions an extended-rank chunk
-  // (chunked + inner): chunked dims are partitioned by `sub_chunk_shape`, and
-  // inner dims are kept whole inside each sub-chunk.  Build the runtime
-  // sub-chunk shape accordingly.
   std::vector<Index> runtime_sub_chunk_shape(sub_chunk_shape.begin(),
                                              sub_chunk_shape.end());
   runtime_sub_chunk_shape.insert(runtime_sub_chunk_shape.end(),
@@ -314,7 +297,7 @@ Result<ZarrArrayToBytesCodec::Ptr> ShardingIndexedCodecSpec::Resolve(
             std::move(sub_chunk_decoded), encoded,
             resolved_options ? &resolved_options->sub_chunk_codecs.emplace()
                              : nullptr));
-    // Get sub-chunk codec chunk layout info (chunked rank only).
+    // Get sub-chunk codec chunk layout info.
     ArrayDataTypeAndShapeInfo array_info;
     array_info.dtype = decoded.dtype;
     array_info.rank = decoded.rank;
@@ -355,8 +338,6 @@ Result<ZarrArrayToBytesCodec::Ptr> ShardingIndexedCodecSpec::Resolve(
         options.index_location.value_or(ShardIndexLocation::kEnd);
     codec->sub_chunk_codec_chain_ = std::move(sub_chunk_codec_chain);
     if (resolved_options) {
-      // The user-form sub_chunk_shape is at the same chunked rank as the
-      // resolved spec; no internal extension to undo.
       if (options.sub_chunk_shape) {
         resolved_options->sub_chunk_shape = *options.sub_chunk_shape;
       } else {
@@ -372,7 +353,6 @@ Result<ZarrArrayToBytesCodec::Ptr> ShardingIndexedCodecSpec::Resolve(
                                                 : ZarrCodecChainSpec{}))
       .Format("Error resolving sub-chunk codecs");
 
-  // Index codecs index the chunked grid only, regardless of inner_shape.
   auto set_up_index_codecs =
       [&](const ZarrCodecChainSpec& index_codecs) -> absl::Status {
     TENSORSTORE_ASSIGN_OR_RETURN(
