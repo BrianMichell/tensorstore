@@ -136,29 +136,17 @@ struct ArrayDataTypeAndShapeInfo {
   // Specifies the data type of the array on which the codec will operate.
   DataType dtype;
 
-  // Specifies the *chunked* rank of the array on which the codec will operate.
-  //
-  // This is the user-visible rank: it does NOT include the inner trailing
-  // dimensions contributed by the dtype's `field_shape` (multi-field structs,
-  // `rN` raw byte fields, `open_as_void`'s byte substitution).  Those inner
-  // dimensions, if any, are reported separately in `inner_shape` and are
-  // pinned at the trailing positions of the runtime array; "array -> array"
-  // codec specs cannot operate on them.
+  // Specifies the rank of the array on which the codec will operate.
+  // This excludes any inner dimensions contributed by `dtype`.
   DimensionIndex rank = dynamic_rank;
 
-  // Specifies the chunked-rank shape of the array on which the codec will
-  // operate.  When present, has exactly `rank` valid entries.
+  // Specifies the shape of the array on which the codec will operate.
+  // When present, has exactly `rank` valid entries.
   std::optional<std::array<Index, kMaxRank>> shape;
 
-  // Inner trailing dimensions contributed by the dtype's `field_shape`.
-  // Empty (the default) when the dtype has no field_shape (i.e. plain scalar
-  // dtype with no codec substitution); non-empty for multi-field structs,
-  // `rN`, and the byte-substituted `open_as_void` view.
-  //
-  // "array -> array" codec specs must propagate this field unchanged from
-  // `decoded` to `encoded`; they cannot read it for resolution decisions and
-  // cannot reshape/permute it.  The "array -> bytes" codec at the bottom of
-  // the chain consumes it (e.g. for sizing the encoded byte stream).
+  // Inner trailing dimensions contributed by `dtype` (e.g. for `open_as_void`).
+  // These are propagated unchanged through "array -> array" codecs and consumed
+  // by the "array -> bytes" codec.
   std::vector<Index> inner_shape;
 };
 
@@ -185,26 +173,23 @@ struct ArrayCodecResolveParameters {
   // Specifies the data type of the array on which the codec will operate.
   DataType dtype;
 
-  // Specifies the *chunked* rank of the array on which the codec will operate
-  // (excludes any `inner_shape` dimensions; see `ArrayDataTypeAndShapeInfo`).
+  // Specifies the rank of the array on which the codec will operate.
+  // This excludes any inner dimensions contributed by `dtype`.
   DimensionIndex rank;
 
   // Specifies the fill value.
   SharedArray<const void> fill_value;
 
-  // Specifies requested read chunk shape (chunked rank only).
+  // Specifies requested read chunk shape.
   std::optional<std::array<Index, kMaxRank>> read_chunk_shape;
 
-  // Specifies requested codec chunk shape (chunked rank only).
+  // Specifies requested codec chunk shape.
   std::optional<std::array<Index, kMaxRank>> codec_chunk_shape;
 
-  // Specifies required inner order (chunked rank only).
+  // Specifies required inner order.
   std::optional<std::array<DimensionIndex, kMaxRank>> inner_order;
 
-  // Inner trailing dimensions contributed by the dtype's `field_shape`; see
-  // the docstring on `ArrayDataTypeAndShapeInfo::inner_shape`.  Propagated
-  // unchanged through "array -> array" codecs; consumed by the "array ->
-  // bytes" codec (e.g. for sizing the on-disk byte stream).
+  // Inner trailing dimensions contributed by `dtype` (e.g. for `open_as_void`).
   std::vector<Index> inner_shape;
 };
 
