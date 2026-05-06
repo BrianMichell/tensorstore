@@ -287,10 +287,8 @@ absl::Status FillValueJsonBinder::operator()(
     std::vector<SharedArray<const void>>* obj, ::nlohmann::json* j) const {
   obj->resize(dtype.fields.size());
   if (dtype.fields.size() == 1) {
-    // Special case: raw_bytes (single field with byte_t and flexible shape)
     if (dtype.fields[0].dtype.id() == DataTypeId::byte_t &&
         !dtype.fields[0].flexible_shape.empty()) {
-      // Handle base64-encoded fill value for raw_bytes
       if (!j->is_string()) {
         return absl::InvalidArgumentError(
             "Expected base64-encoded string for raw_bytes fill_value");
@@ -301,7 +299,6 @@ absl::Status FillValueJsonBinder::operator()(
             "Expected valid base64-encoded fill value, but received: %s",
             j->dump()));
       }
-      // Verify size matches expected byte array size
       Index expected_size = dtype.fields[0].num_inner_elements;
       if (static_cast<Index>(b64_decoded.size()) != expected_size) {
         return absl::InvalidArgumentError(absl::StrFormat(
@@ -309,7 +306,6 @@ absl::Status FillValueJsonBinder::operator()(
             "%d bytes",
             expected_size, b64_decoded.size()));
       }
-      // Create fill value array
       auto fill_arr = AllocateArray(dtype.fields[0].field_shape, c_order,
                                    default_init, dtype.fields[0].dtype);
       std::memcpy(fill_arr.data(), b64_decoded.data(), b64_decoded.size());
@@ -319,9 +315,7 @@ absl::Status FillValueJsonBinder::operator()(
           DecodeSingle(*j, dtype.fields[0].dtype, (*obj)[0]));
     }
   } else {
-    // For structured types, handle object, array, and base64-encoded string
     if (j->is_object()) {
-      // Zarr v3 struct extension format: {"field_name": value, ...}
       for (size_t i = 0; i < dtype.fields.size(); ++i) {
         const auto& field_name = dtype.fields[i].name;
         if (j->contains(field_name)) {
@@ -333,14 +327,12 @@ absl::Status FillValueJsonBinder::operator()(
         }
       }
     } else if (j->is_string()) {
-      // Legacy: decode base64-encoded fill value for entire struct
       std::string b64_decoded;
       if (!absl::Base64Unescape(j->get<std::string>(), &b64_decoded)) {
         return absl::InvalidArgumentError(absl::StrFormat(
             "Expected valid base64-encoded fill value, but received: %s",
             j->dump()));
       }
-      // Verify size matches expected struct size
       if (static_cast<Index>(b64_decoded.size()) !=
           dtype.bytes_per_outer_element) {
         return absl::InvalidArgumentError(absl::StrFormat(
@@ -348,7 +340,6 @@ absl::Status FillValueJsonBinder::operator()(
             "%d bytes",
             dtype.bytes_per_outer_element, b64_decoded.size()));
       }
-      // Extract per-field fill values from decoded bytes
       for (size_t i = 0; i < dtype.fields.size(); ++i) {
         const auto& field = dtype.fields[i];
         auto arr = AllocateArray(span<const Index, 0>{}, c_order, default_init,
@@ -358,7 +349,6 @@ absl::Status FillValueJsonBinder::operator()(
         (*obj)[i] = std::move(arr);
       }
     } else if (j->is_array()) {
-      // Legacy: array format [value1, value2, ...]
       if (j->size() != dtype.fields.size()) {
         return internal_json::ExpectedError(
             *j, absl::StrFormat("array of size %d", dtype.fields.size()));
@@ -382,7 +372,6 @@ absl::Status FillValueJsonBinder::operator()(
   if (dtype.fields.size() == 1) {
     return EncodeSingle((*obj)[0], dtype.fields[0].dtype, *j);
   }
-  // Structured fill value - use object format per spec
   *j = ::nlohmann::json::object();
   for (size_t i = 0; i < dtype.fields.size(); ++i) {
     ::nlohmann::json item;
@@ -408,7 +397,6 @@ absl::Status FillValueJsonBinder::DecodeSingle(::nlohmann::json& j,
       AllocateArray(span<const Index, 0>{}, c_order, default_init, data_type);
   void* data = arr.data();
   out = std::move(arr);
-  // Special handling for byte_t: use uint8_t functions since they're binary compatible
   auto type_id = data_type.id();
   if (type_id == DataTypeId::byte_t) {
     type_id = DataTypeId::uint8_t;
@@ -434,7 +422,6 @@ absl::Status FillValueJsonBinder::EncodeSingle(
     return absl::InvalidArgumentError(
         "data_type must be specified before fill_value");
   }
-  // Special handling for byte_t: use uint8_t functions since they're binary compatible
   auto type_id = data_type.id();
   if (type_id == DataTypeId::byte_t) {
     type_id = DataTypeId::uint8_t;
@@ -902,7 +889,6 @@ absl::Status ValidateMetadata(const ZarrMetadata& metadata,
                               const ZarrMetadataConstraints& constraints) {
   using internal::MetadataMismatchError;
   if (constraints.data_type) {
-    // Compare ZarrDType
     if (::nlohmann::json(*constraints.data_type) !=
         ::nlohmann::json(metadata.data_type)) {
       return MetadataMismatchError(
@@ -911,7 +897,6 @@ absl::Status ValidateMetadata(const ZarrMetadata& metadata,
     }
   }
   if (constraints.fill_value) {
-    // Compare vector of arrays
     if (constraints.fill_value->size() != metadata.fill_value.size()) {
       return MetadataMismatchError("fill_value size",
                                    constraints.fill_value->size(),
@@ -1264,9 +1249,6 @@ absl::Status SetChunkLayoutFromMetadata(
 Result<ChunkLayout> GetEffectiveChunkLayout(
     const ZarrMetadataConstraints& metadata_constraints, const Schema& schema) {
   SpecRankAndFieldInfo info;
-  // Use metadata_constraints.rank when available: it represents the logical
-  // rank (matching chunk_shape dimensions).  schema.rank() may be larger when
-  // open_as_void adds a bytes dimension.
   info.chunked_rank = metadata_constraints.rank;
   if (info.chunked_rank == dynamic_rank) {
     info.chunked_rank = schema.rank().rank;
@@ -1277,9 +1259,6 @@ Result<ChunkLayout> GetEffectiveChunkLayout(
   if (info.chunked_rank == dynamic_rank && metadata_constraints.chunk_shape) {
     info.chunked_rank = metadata_constraints.chunk_shape->size();
   }
-  // We can't easily know field info from constraints unless we parse data_type.
-  // If data_type is present and has 1 field, we can check it.
-  // For now, basic implementation.
 
   ChunkLayout chunk_layout = schema.chunk_layout();
   std::optional<span<const Index>> chunk_shape_span;

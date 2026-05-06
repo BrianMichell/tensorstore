@@ -659,7 +659,6 @@ TEST(FillValueTest, Float64) {
 }
 
 TEST(FillValueTest, StructuredObjectFormat) {
-  // Create a structured dtype with two fields
   ZarrDType dtype;
   dtype.has_fields = true;
   dtype.fields.resize(2);
@@ -679,7 +678,6 @@ TEST(FillValueTest, StructuredObjectFormat) {
 
   FillValueJsonBinder binder(dtype);
 
-  // Test parsing object format
   ::nlohmann::json object_json = {{"x", 42}, {"y", -100}};
   TENSORSTORE_ASSERT_OK_AND_ASSIGN(
       auto fill_values,
@@ -688,7 +686,6 @@ TEST(FillValueTest, StructuredObjectFormat) {
   EXPECT_EQ(*static_cast<const uint8_t*>(fill_values[0].data()), 42);
   EXPECT_EQ(*static_cast<const int16_t*>(fill_values[1].data()), -100);
 
-  // Test serialization uses object format
   TENSORSTORE_ASSERT_OK_AND_ASSIGN(auto output_json,
                                    jb::ToJson(fill_values, binder));
   EXPECT_TRUE(output_json.is_object());
@@ -697,7 +694,6 @@ TEST(FillValueTest, StructuredObjectFormat) {
 }
 
 TEST(FillValueTest, StructuredLegacyArrayFormat) {
-  // Create a structured dtype with two fields
   ZarrDType dtype;
   dtype.has_fields = true;
   dtype.fields.resize(2);
@@ -717,7 +713,6 @@ TEST(FillValueTest, StructuredLegacyArrayFormat) {
 
   FillValueJsonBinder binder(dtype);
 
-  // Test parsing legacy array format
   ::nlohmann::json array_json = {123, 1.5};
   TENSORSTORE_ASSERT_OK_AND_ASSIGN(
       auto fill_values,
@@ -728,7 +723,6 @@ TEST(FillValueTest, StructuredLegacyArrayFormat) {
 }
 
 TEST(FillValueTest, StructuredObjectOmittedFieldsError) {
-  // Create a structured dtype with two fields
   ZarrDType dtype;
   dtype.has_fields = true;
   dtype.fields.resize(2);
@@ -748,7 +742,6 @@ TEST(FillValueTest, StructuredObjectOmittedFieldsError) {
 
   FillValueJsonBinder binder(dtype);
 
-  // Test parsing object format with only one field specified
   ::nlohmann::json partial_json = {{"present", 42}};
   EXPECT_THAT(
       jb::FromJson<std::vector<SharedArray<const void>>>(partial_json, binder),
@@ -827,7 +820,6 @@ TEST(GetSpecRankAndFieldInfoTest, SelectedFieldWithFieldShape) {
 
 TEST(GetSpecRankAndFieldInfoTest, DeriveRankFromSchema) {
   ZarrMetadataConstraints constraints;
-  // No rank in constraints
   constraints.data_type.emplace();
   constraints.data_type->has_fields = false;
   constraints.data_type->fields.resize(1);
@@ -842,7 +834,6 @@ TEST(GetSpecRankAndFieldInfoTest, DeriveRankFromSchema) {
       GetSpecRankAndFieldInfo(constraints, /*selected_field=*/"", schema,
                               /*open_as_void=*/false));
   EXPECT_EQ(info.full_rank, 3);
-  // chunked_rank derived from full_rank - field_rank (0)
   EXPECT_EQ(info.chunked_rank, 3);
   EXPECT_EQ(info.field_rank, 0);
 }
@@ -872,7 +863,6 @@ TEST(ValidateSpecRankAndFieldInfoTest, DerivesFullRank) {
   tensorstore::internal_zarr3::SpecRankAndFieldInfo info;
   info.chunked_rank = 2;
   info.field_rank = 1;
-  // full_rank is dynamic
 
   TENSORSTORE_ASSERT_OK(
       tensorstore::internal_zarr3::ValidateSpecRankAndFieldInfo(info));
@@ -883,7 +873,6 @@ TEST(ValidateSpecRankAndFieldInfoTest, DerivesChunkedRank) {
   tensorstore::internal_zarr3::SpecRankAndFieldInfo info;
   info.full_rank = 5;
   info.field_rank = 2;
-  // chunked_rank is dynamic
 
   TENSORSTORE_ASSERT_OK(
       tensorstore::internal_zarr3::ValidateSpecRankAndFieldInfo(info));
@@ -894,7 +883,7 @@ TEST(ValidateSpecRankAndFieldInfoTest, InconsistentRanksError) {
   tensorstore::internal_zarr3::SpecRankAndFieldInfo info;
   info.full_rank = 5;
   info.chunked_rank = 2;
-  info.field_rank = 1;  // 2 + 1 != 5
+  info.field_rank = 1;
 
   EXPECT_THAT(
       tensorstore::internal_zarr3::ValidateSpecRankAndFieldInfo(info),
@@ -959,7 +948,6 @@ TEST(TrySetMetadataConstraintsOnSchemaTest, SetsRankWithFieldShape) {
           constraints, /*selected_field=*/"matrix", /*open_as_void=*/false,
           schema));
 
-  // Rank should be metadata_rank (2) + field_shape rank (2) = 4
   EXPECT_EQ(schema.rank(), 4);
 }
 
