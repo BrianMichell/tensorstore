@@ -78,10 +78,9 @@ struct ZarrDType {
     /// specified as an array.  Otherwise, is empty.
     std::string name;
 
-    /// Inner array dimensions of this field, derived from `flexible_shape`.
-    /// Inner array shape contributed by this field to the full TensorStore
-    /// rank.  For scalar fields this is empty; for raw byte fields (e.g.
-    /// `r24`, structured-as-void access) this is the inner shape that is
+    /// Inner array dimensions of this field (derived from `flexible_shape`).
+    ///
+    /// Empty for scalar fields.  For raw byte fields (e.g. `r24`) this is
     /// surfaced as trailing dimensions in the user-visible array.
     std::vector<Index> field_shape;
 

@@ -230,10 +230,8 @@ TEST(ParseDType, DuplicateFieldName) {
 }
 
 TEST(ValidateDType, RejectsEmptyFields) {
-  // Defensive guard: a default-constructed `ZarrDType` has no fields, which
-  // is an invariant violation for downstream consumers indexing `fields[0]`.
-  // The JSON parsers all enforce non-empty fields, so this only fires for
-  // programmatic constructions that bypass the parser.
+  // Bypassing the JSON parsers leaves `fields` empty; downstream code
+  // assumes `fields[0]` exists.
   ZarrDType empty;
   EXPECT_THAT(ValidateDType(empty),
               StatusIs(absl::StatusCode::kFailedPrecondition,
