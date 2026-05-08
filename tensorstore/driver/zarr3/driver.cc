@@ -151,53 +151,50 @@ class ZarrDriverSpec
   }
 
   Result<IndexDomain<>> GetDomain() const override {
-    // When the array contributes trailing field_shape dimensions
-    // (open_as_void or a selected rN/struct field), build the domain by
-    // appending those dimensions to the chunked dimensions stored in
-    // `metadata_constraints`.  Both cases are uniform under the field_shape
-    // model: open_as_void is just `field_shape = {bytes_per_outer_element}`
-    // contributed by the synthetic void view of the data type.
-    if (metadata_constraints.data_type && metadata_constraints.shape) {
-      const Index byte_dim =
-          metadata_constraints.data_type->bytes_per_outer_element;
-      span<const Index> field_shape;
-      if (open_as_void) {
-        field_shape = span<const Index>(&byte_dim, 1);
-      } else if (!selected_field.empty()) {
-        const auto& dtype = *metadata_constraints.data_type;
-        for (const auto& field : dtype.fields) {
-          if (field.name == selected_field && !field.field_shape.empty()) {
-            field_shape = span<const Index>(field.field_shape.data(),
-                                            field.field_shape.size());
-            break;
-          }
+    if (!metadata_constraints.data_type || !metadata_constraints.shape) {
+      return GetEffectiveDomain(metadata_constraints, schema);
+    }
+
+    const Index byte_dim =
+        metadata_constraints.data_type->bytes_per_outer_element;
+    span<const Index> field_shape;
+    if (open_as_void) {
+      field_shape = span<const Index>(&byte_dim, 1);
+    } else if (!selected_field.empty()) {
+      const auto& dtype = *metadata_constraints.data_type;
+      for (const auto& field : dtype.fields) {
+        if (field.name == selected_field && !field.field_shape.empty()) {
+          field_shape = span<const Index>(field.field_shape.data(),
+                                          field.field_shape.size());
+          break;
         }
-      }
-      if (!field_shape.empty()) {
-        const DimensionIndex chunked_rank =
-            metadata_constraints.shape->size();
-        const DimensionIndex total_rank = chunked_rank + field_shape.size();
-        IndexDomainBuilder builder(total_rank);
-        std::fill_n(builder.origin().begin(), total_rank, Index{0});
-        std::copy_n(metadata_constraints.shape->begin(), chunked_rank,
-                    builder.shape().begin());
-        std::copy_n(field_shape.begin(), field_shape.size(),
-                    builder.shape().begin() + chunked_rank);
-        builder.implicit_lower_bounds(DimensionSet(false));
-        builder.implicit_upper_bounds(DimensionSet::UpTo(chunked_rank));
-        if (metadata_constraints.dimension_names) {
-          for (DimensionIndex j = 0; j < chunked_rank; ++j) {
-            if (const auto& name = (*metadata_constraints.dimension_names)[j];
-                name.has_value()) {
-              builder.labels()[j] = *name;
-            }
-          }
-        }
-        return builder.Finalize();
       }
     }
 
-    return GetEffectiveDomain(metadata_constraints, schema);
+    if (field_shape.empty()) {
+      return GetEffectiveDomain(metadata_constraints, schema);
+    }
+
+    const DimensionIndex chunked_rank =
+        metadata_constraints.shape->size();
+    const DimensionIndex total_rank = chunked_rank + field_shape.size();
+    IndexDomainBuilder builder(total_rank);
+    std::fill_n(builder.origin().begin(), total_rank, Index{0});
+    std::copy_n(metadata_constraints.shape->begin(), chunked_rank,
+                builder.shape().begin());
+    std::copy_n(field_shape.begin(), field_shape.size(),
+                builder.shape().begin() + chunked_rank);
+    builder.implicit_lower_bounds(DimensionSet(false));
+    builder.implicit_upper_bounds(DimensionSet::UpTo(chunked_rank));
+    if (metadata_constraints.dimension_names) {
+      for (DimensionIndex j = 0; j < chunked_rank; ++j) {
+        if (const auto& name = (*metadata_constraints.dimension_names)[j];
+            name.has_value()) {
+          builder.labels()[j] = *name;
+        }
+      }
+    }
+    return builder.Finalize();
   }
 
   Result<SharedArray<const void>> GetFillValue(
@@ -206,14 +203,12 @@ class ZarrDriverSpec
 
     const auto& constraints = metadata_constraints;
 
-    // If constraints don't specify a fill value, just use the schema's.
     if (!constraints.fill_value || constraints.fill_value->empty()) {
       return fill_value;
     }
 
     const auto& vec = *constraints.fill_value;
 
-    // If we don't have dtype information, we can't do field-aware logic.
     if (!constraints.data_type) {
       if (!vec.empty()) return vec[0];
       return fill_value;
@@ -221,11 +216,6 @@ class ZarrDriverSpec
 
     const ZarrDType& dtype = *constraints.data_type;
 
-    // ── Void access: synthesize a byte-level fill value ────────────────────────
-    //
-    // Defer to `MakeVoidFillValue` so the spec-level fill is byte-identical
-    // to the data-cache-level fill produced by `GetVoidMetadata` (codec
-    // endianness is honoured uniformly for non-struct, non-rN dtypes).
     if (open_as_void) {
       const ZarrCodecChainSpec empty_codec_specs;
       const ZarrCodecChainSpec& codec_specs =
@@ -235,13 +225,11 @@ class ZarrDriverSpec
           MakeVoidFillValue(dtype, codec_specs, vec));
     }
 
-    // ── Normal field access: just return that field's fill_value ───────────────
     TENSORSTORE_ASSIGN_OR_RETURN(
         size_t field_index, GetFieldIndex(dtype, selected_field));
     if (field_index < vec.size()) {
       return vec[field_index];
     }
-    // Fallback to "no fill".
     return SharedArray<const void>();
   }
 
@@ -328,11 +316,6 @@ class DataCacheBase
 
   virtual ZarrChunkCache& zarr_chunk_cache() = 0;
 
-  /// Returns the fill value to expose to user-visible reads for the given
-  /// component (field) index.  By default this is just the per-field fill
-  /// value stored in the natural metadata; the `open_as_void` data cache
-  /// overrides this to return the packed single-byte fill value computed at
-  /// open time.
   virtual SharedArray<const void> GetEffectiveFillValue(size_t component_index) {
     const auto& m = this->metadata();
     if (component_index >= m.fill_value.size()) {
@@ -370,15 +353,6 @@ class DataCacheBase
          i < static_cast<DimensionIndex>(metadata.shape.size()); ++i) {
       implicit_upper_bounds[i] = true;
     }
-    // The user-visible domain is `metadata.shape` extended by the
-    // metadata-level `field_shape` (the same vector that drives the codec
-    // resolution shape).  This covers `rN` raw byte fields, the
-    // sharding-substituted dtype, and the synthetic single-byte view
-    // produced by `GetVoidMetadata` for `open_as_void`.  Multi-field structs
-    // have `metadata.field_shape == {bytes_per_outer_element}` for the
-    // codec view, but the *user* must select a field first; here we only
-    // extend bounds when the dtype has a single field, so the trailing
-    // dim(s) are unambiguously user-visible.
     if (bounds.rank() > static_cast<DimensionIndex>(metadata.shape.size()) &&
         metadata.data_type.fields.size() == 1 &&
         !metadata.field_shape.empty()) {
@@ -415,11 +389,6 @@ class DataCacheBase
   static internal::ChunkGridSpecification GetChunkGridSpecification(
       const ZarrMetadata& metadata) {
     assert(!metadata.fill_value.empty());
-    // The cache always sees a `metadata` whose `data_type` correctly
-    // describes the field structure -- including the synthetic single-byte
-    // field with `field_shape = {bytes_per_outer_element}` that
-    // `GetVoidMetadata` produces for `open_as_void`.  `CreateFieldGridSpecification`
-    // therefore handles scalar, struct, rN, and open-as-void modes uniformly.
     return CreateFieldGridSpecification(
         metadata.chunk_shape, metadata.data_type,
         span(metadata.inner_order.data(), metadata.rank), &metadata.fill_value);
@@ -508,7 +477,6 @@ class DataCacheBase
 
   Result<IndexTransform<>> GetExternalToInternalTransform(
       const void* metadata_ptr, size_t component_index) override {
-    // component_index corresponds to the selected field index
     const auto& metadata = *static_cast<const ZarrMetadata*>(metadata_ptr);
     const auto& field = metadata.data_type.fields[component_index];
     const DimensionIndex rank = metadata.rank;
@@ -547,7 +515,6 @@ class DataCacheBase
     auto& spec = static_cast<ZarrDriverSpec&>(spec_base);
     const auto& metadata = *static_cast<const ZarrMetadata*>(metadata_ptr);
     spec.metadata_constraints = ZarrMetadataConstraints(metadata);
-    // Encode selected_field from component_index
     if (metadata.data_type.has_fields &&
         component_index < metadata.data_type.fields.size()) {
       spec.selected_field = metadata.data_type.fields[component_index].name;
@@ -585,13 +552,6 @@ using internal_kvs_backed_chunk_driver::DataCacheInitializer;
 template <typename ChunkCacheImpl>
 class ZarrDataCache : public ChunkCacheImpl, public DataCacheBase {
  public:
-  // `effective_metadata` is the metadata view the cache operates on for chunk
-  // decoding, grid layout, fills, transforms, and bounds.  It is always
-  // populated -- when no substitution applies it aliases the persisted
-  // (natural) metadata; under `open_as_void` it is the byte-substituted view
-  // produced by `GetVoidMetadata`.  `is_substituted` records whether a
-  // substitution was applied; it is the single bit required to round-trip
-  // `open_as_void` back into the spec.
   template <typename... U>
   explicit ZarrDataCache(DataCacheInitializer&& initializer,
                          std::string key_prefix,
@@ -627,14 +587,6 @@ class ZarrDataCache : public ChunkCacheImpl, public DataCacheBase {
     return DataCacheBase::executor();
   }
 
-  // The framework hands `metadata_ptr` from the metadata cache (i.e. the
-  // current persisted form).  Cache-internal layout/transform logic drives
-  // off `effective_metadata_` only when a substitution was applied at open
-  // time -- otherwise we forward the live `metadata_ptr` so that operations
-  // like `Resize` correctly observe the post-resize shape.  Either way the
-  // base implementation reads `field_shape` off whichever metadata it gets
-  // and produces the right user-visible rank with no `open_as_void`-aware
-  // branching beyond the substitution site itself.
   const void* RouteMetadata(const void* metadata_ptr) const {
     return is_substituted_ ? effective_metadata_.get() : metadata_ptr;
   }
@@ -656,9 +608,6 @@ class ZarrDataCache : public ChunkCacheImpl, public DataCacheBase {
   absl::Status GetBoundSpecData(KvsDriverSpec& spec_base,
                                 const void* metadata_ptr,
                                 size_t component_index) override {
-    // The persisted (natural) metadata drives the spec body so the user sees
-    // their original dtype on round-trip.  `open_as_void` is the only piece
-    // of substitution-time state the cache must surface back into the spec.
     TENSORSTORE_RETURN_IF_ERROR(
         DataCacheBase::GetBoundSpecData(spec_base, metadata_ptr, component_index));
     auto& spec = static_cast<ZarrDriverSpec&>(spec_base);
@@ -695,10 +644,6 @@ class ZarrDriver : public ZarrDriverBase {
 
   Result<SharedArray<const void>> GetFillValue(
       IndexTransformView<> transform) override {
-    // The data cache routes this through any substituted view metadata, so
-    // `open_as_void` returns the packed single-byte fill value at index 0
-    // while normal access returns the per-component fill from the natural
-    // metadata.
     return static_cast<DataCacheBase*>(cache())->GetEffectiveFillValue(
         this->component_index());
   }
@@ -782,34 +727,16 @@ class ZarrDriver::OpenState : public ZarrDriver::OpenStateBase {
  public:
   using ZarrDriver::OpenStateBase::OpenStateBase;
 
-  // Lazily computed (and memoised across `GetComponentIndex` /
-  // `GetDataCache`) byte-substituted view of the metadata.  Only non-null
-  // when `spec().open_as_void` is true and a successful substitution has
-  // already been performed against the framework-supplied `metadata_ptr`.
-  // Both call sites pass the same pointer (the persisted metadata), so a
-  // single computation suffices for both validation and cache construction.
   Result<std::shared_ptr<const ZarrMetadata>> GetOrComputeVoidMetadata(
       const ZarrMetadata& metadata) {
-    if (!cached_void_metadata_for_) {
-      TENSORSTORE_ASSIGN_OR_RETURN(auto void_metadata,
+    if (!cached_void_metadata_) {
+      TENSORSTORE_ASSIGN_OR_RETURN(cached_void_metadata_,
                                    internal_zarr3::GetVoidMetadata(metadata));
-      cached_void_metadata_ = std::move(void_metadata);
-      cached_void_metadata_for_ = &metadata;
-    }
-    // Defensive: if the framework ever started passing a different metadata
-    // object across calls, recompute rather than serve stale state.  In the
-    // current code path this branch is unreachable.
-    if (cached_void_metadata_for_ != &metadata) {
-      TENSORSTORE_ASSIGN_OR_RETURN(auto void_metadata,
-                                   internal_zarr3::GetVoidMetadata(metadata));
-      cached_void_metadata_ = std::move(void_metadata);
-      cached_void_metadata_for_ = &metadata;
     }
     return cached_void_metadata_;
   }
 
   std::shared_ptr<const ZarrMetadata> cached_void_metadata_;
-  const ZarrMetadata* cached_void_metadata_for_ = nullptr;
 
   std::string GetPrefixForDeleteExisting() override {
     return spec().store.path;
@@ -860,18 +787,9 @@ class ZarrDriver::OpenState : public ZarrDriver::OpenStateBase {
     const auto& metadata =
         *static_cast<const ZarrMetadata*>(initializer.metadata.get());
 
-    // Build the cache-side `effective_metadata`: under `open_as_void` this is
-    // the byte-substituted view produced by `GetVoidMetadata`; otherwise it
-    // aliases the persisted metadata.  Everything downstream -- chunk cache,
-    // grid spec, codec state -- runs against that single view, with no
-    // `open_as_void`-specific branching beyond the substitution itself.
     std::shared_ptr<const ZarrMetadata> effective_metadata;
     bool is_substituted = false;
     if (spec().open_as_void) {
-      // Reuse the substitution that `GetComponentIndex` already performed;
-      // `GetOrComputeVoidMetadata` memoises by metadata pointer and avoids
-      // re-resolving the codec chain.  `CHECK` here because validation has
-      // already succeeded by this point in the open flow.
       TENSORSTORE_CHECK_OK_AND_ASSIGN(effective_metadata,
                                       GetOrComputeVoidMetadata(metadata));
       is_substituted = true;
@@ -901,14 +819,10 @@ class ZarrDriver::OpenState : public ZarrDriver::OpenStateBase {
         return absl::InvalidArgumentError(
             "\"field\" and \"open_as_void\" are mutually exclusive");
       }
-      // Compute the void substitution once and stash it on the open state;
-      // `GetDataCache` reuses the same shared_ptr below to avoid re-resolving
-      // the codec chain.
       TENSORSTORE_ASSIGN_OR_RETURN(auto void_metadata,
                                    GetOrComputeVoidMetadata(metadata));
       TENSORSTORE_RETURN_IF_ERROR(ValidateMetadataSchema(
           *void_metadata, /*field_index=*/0, spec().schema));
-      // The void view exposes a single component (the synthetic byte field).
       return static_cast<size_t>(0);
     }
     TENSORSTORE_ASSIGN_OR_RETURN(
