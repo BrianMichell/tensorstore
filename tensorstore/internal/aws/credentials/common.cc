@@ -36,6 +36,7 @@ namespace internal_aws {
 namespace {
 
 inline AwsCredentialsProvider AsProvider(aws_credentials_provider* p) {
+  if (!p) return nullptr;
   assert(aws_atomic_load_int(&p->ref_count) == 1);
   return AwsCredentialsProvider(p, internal::adopt_object_ref);
 }
